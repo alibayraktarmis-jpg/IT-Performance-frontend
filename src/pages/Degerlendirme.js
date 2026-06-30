@@ -38,10 +38,10 @@ function Degerlendirme() {
     }).catch(() => {});
     api.get('/Degerlendirmeler').then(res => setTumDegerlendirmeler(res.data || [])).catch(() => {});
     api.get('/AnaBasliklar?sadaceAktif=true').then(res => {
-      setAnaBasliklar(res.data.filter(ab => ab.aktifMi ?? ab.AktifMi));
+      setAnaBasliklar(res.data);
     }).catch(() => {});
     api.get('/AltKriterler?sadaceAktif=true').then(async res => {
-      const aktifler = res.data.filter(ak => ak.aktifMi ?? ak.AktifMi);
+      const aktifler = res.data;
       setAltKriterler(aktifler);
       const aciklamaMap = {};
       await Promise.all(aktifler.map(async ak => {
@@ -138,7 +138,6 @@ function Degerlendirme() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!secilenCalisan && !secilenDonem) { setHata('Lütfen çalışan ve dönem seçin.'); return; }
     if (!secilenCalisan) { setHata('Lütfen bir çalışan seçin.'); return; }
     if (!secilenDonem) { setHata('Lütfen bir dönem seçin.'); return; }
 

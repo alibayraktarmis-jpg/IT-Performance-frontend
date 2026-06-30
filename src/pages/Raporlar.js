@@ -113,18 +113,13 @@ function Raporlar() {
   };
 
   const dosyaIndir = (endpoint, dosyaAdi) => {
-    const token = localStorage.getItem('token');
-    fetch(`https://localhost:7006/api/Degerlendirmeler/${endpoint}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(res => res.blob())
-      .then(blob => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = dosyaAdi;
-        a.click();
-      });
+    api.get(`/Degerlendirmeler/${endpoint}`, { responseType: 'blob' }).then(res => {
+      const url = window.URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = dosyaAdi;
+      a.click();
+    });
   };
 
   const grafikVerisi = rol === 'Employee'
