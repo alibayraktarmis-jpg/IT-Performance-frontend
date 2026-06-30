@@ -12,6 +12,10 @@ function Hedefler() {
   const [aciklama, setAciklama] = useState('');
   const [bitisTarihi, setBitisTarihi] = useState('');
   const [hata, setHata] = useState('');
+  const [duzenleModalAcik, setDuzenleModalAcik] = useState(false);
+  const [duzenlenecekHedef, setDuzenlenecekHedef] = useState(null);
+  const [duzenleAciklama, setDuzenleAciklama] = useState('');
+  const [duzenleBitis, setDuzenleBitis] = useState('');
 
   const hedefleriGetir = () => {
     api.get('/Hedefler').then(res => setHedefler(res.data)).catch(() => {});
@@ -53,6 +57,29 @@ function Hedefler() {
     const endpoint = tamamlandi ? `/Hedefler/${hedefId}/geriAl` : `/Hedefler/${hedefId}/tamamla`;
     await api.put(endpoint).catch(() => {});
     hedefleriGetir();
+  };
+
+  const duzenleAc = (h) => {
+    setDuzenlenecekHedef(h);
+    setDuzenleAciklama(h.Aciklama ?? h.aciklama ?? '');
+    const bitis = new Date(h.BitisTarihi ?? h.bitisTarihi);
+    setDuzenleBitis(bitis.toISOString().split('T')[0]);
+    setDuzenleModalAcik(true);
+  };
+
+  const hedefGuncelle = async () => {
+    if (!duzenleAciklama || !duzenleBitis) return;
+    try {
+      await api.put(`/Hedefler/${duzenlenecekHedef.Id ?? duzenlenecekHedef.id}`, {
+        aciklama: duzenleAciklama,
+        bitisTarihi: new Date(duzenleBitis).toISOString()
+      });
+      setDuzenleModalAcik(false);
+      setDuzenlenecekHedef(null);
+      hedefleriGetir();
+    } catch {
+      setHata('Güncelleme sırasında hata oluştu.');
+    }
   };
 
   const sil = async (hedefId) => {
@@ -122,12 +149,20 @@ function Hedefler() {
             {tamamlandi ? 'Geri Al' : 'Tamamlandı'}
           </button>
           {(rol === 'Admin' || rol === 'Evaluator') && (
-            <button
-              onClick={() => sil(h.Id ?? h.id)}
-              style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', backgroundColor: '#2a2a2a', color: '#f87171' }}
-            >
-              Sil
-            </button>
+            <>
+              <button
+                onClick={() => duzenleAc(h)}
+                style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #4f46e5', cursor: 'pointer', fontSize: '13px', backgroundColor: 'transparent', color: '#818cf8' }}
+              >
+                Düzenle
+              </button>
+              <button
+                onClick={() => sil(h.Id ?? h.id)}
+                style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', backgroundColor: '#2a2a2a', color: '#f87171' }}
+              >
+                Sil
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -173,6 +208,30 @@ function Hedefler() {
           </div>
         )}
       </div>
+
+      {duzenleModalAcik && (
+        <div style={styles.modalArka} onClick={() => setDuzenleModalAcik(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div style={styles.modalBaslik}>Hedef Düzenle</div>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Hedef Açıklaması</label>
+              <textarea
+                style={{ ...styles.input, resize: 'vertical', minHeight: '80px', lineHeight: '1.5' }}
+                value={duzenleAciklama}
+                onChange={e => setDuzenleAciklama(e.target.value)}
+              />
+            </div>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Bitiş Tarihi</label>
+              <input type="date" style={styles.input} value={duzenleBitis} onChange={e => setDuzenleBitis(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+              <button onClick={hedefGuncelle} style={styles.kaydetButon}>Güncelle</button>
+              <button onClick={() => setDuzenleModalAcik(false)} style={styles.iptalButon}>İptal</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalAcik && (
         <div style={styles.modalArka} onClick={() => setModalAcik(false)}>

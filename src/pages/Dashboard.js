@@ -12,6 +12,7 @@ function Dashboard() {
   const [degerlendirmeler, setDegerlendirmeler] = useState([]);
   const [sonDegerlendirme, setSonDegerlendirme] = useState(null);
   const [employeeGrafik, setEmployeeGrafik] = useState([]);
+  const [secilenDep, setSecilenDep] = useState('Tümü');
 
   useEffect(() => {
     api.get('/Degerlendirmeler/siralama').then(res => setSiralama(res.data)).catch(() => {});
@@ -132,30 +133,47 @@ function Dashboard() {
 
         {(rol === 'Admin' || rol === 'Evaluator') && (
           <>
-            <div style={styles.kartGrid}>
-              <div style={styles.kart}>
-                <div style={styles.kartEtiket}>Toplam Çalışan</div>
-                <div style={styles.kartDeger}>{siralama.filter(s => s.Rol === 'Employee').length}</div>
-              </div>
-              <div style={styles.kart}>
-                <div style={styles.kartEtiket}>Değerlendirilen</div>
-                <div style={styles.kartDeger}>{siralama.filter(s => s.OrtalamaToplamSkor && s.Rol === 'Employee').length}</div>
-              </div>
-              <div style={styles.kart}>
-                <div style={styles.kartEtiket}>Genel Ortalama</div>
-                <div style={styles.kartDeger}>
-                  {(() => {
-                    const emp = siralama.filter(s => s.Rol === 'Employee' && s.OrtalamaToplamSkor);
-                    return emp.length > 0
-                      ? (emp.reduce((a, b) => a + b.OrtalamaToplamSkor, 0) / emp.length).toFixed(1)
-                      : '-';
-                  })()}
+            {(() => {
+              const depFiltreli = siralama.filter(s =>
+                s.Rol === 'Employee' && (secilenDep === 'Tümü' ? true : s.Departman === secilenDep)
+              );
+              const degerlendirilen = depFiltreli.filter(s => s.OrtalamaToplamSkor);
+              const ortalama = degerlendirilen.length > 0
+                ? (degerlendirilen.reduce((a, b) => a + b.OrtalamaToplamSkor, 0) / degerlendirilen.length).toFixed(1)
+                : '-';
+              return (
+                <div style={styles.kartGrid}>
+                  <div style={styles.kart}>
+                    <div style={styles.kartEtiket}>Toplam Çalışan</div>
+                    <div style={styles.kartDeger}>{depFiltreli.length}</div>
+                  </div>
+                  <div style={styles.kart}>
+                    <div style={styles.kartEtiket}>Değerlendirilen</div>
+                    <div style={styles.kartDeger}>{degerlendirilen.length}</div>
+                  </div>
+                  <div style={styles.kart}>
+                    <div style={styles.kartEtiket}>Genel Ortalama</div>
+                    <div style={styles.kartDeger}>{ortalama}</div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()}
 
             <div style={styles.bolum}>
-              <div style={styles.bolumBaslik}>Sıralama</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={styles.bolumBaslik}>Sıralama</div>
+                {rol === 'Admin' && (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {['Tümü', 'İş Analistleri', 'Yazılımcılar', 'QA/Test Uzmanları'].map(dep => (
+                      <button key={dep} onClick={() => setSecilenDep(dep)} style={{
+                        padding: '6px 14px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '500',
+                        backgroundColor: secilenDep === dep ? '#4f46e5' : '#2a2a2a',
+                        color: secilenDep === dep ? '#fff' : '#a0a0a0',
+                      }}>{dep}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <table style={styles.tabloEl}>
                 <thead>
                   <tr>
@@ -167,17 +185,22 @@ function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {siralama.length > 0 ? siralama.map((s, i) => (
-                    <tr key={i}>
-                      <td style={styles.td}>{i + 1}</td>
-                      <td style={styles.td}>{s.Ad} {s.Soyad}</td>
-                      <td style={styles.td}>{s.Departman}</td>
-                      <td style={styles.td}>{s.Rol}</td>
-                      <td style={styles.td}>{s.OrtalamaToplamSkor ? s.OrtalamaToplamSkor.toFixed(2) : '-'}</td>
-                    </tr>
-                  )) : (
-                    <tr><td colSpan="5" style={{ ...styles.td, textAlign: 'center' }}>Henüz değerlendirme verisi bulunmuyor.</td></tr>
-                  )}
+                  {(() => {
+                    const filtreli = siralama.filter(s =>
+                      s.Rol === 'Employee' && (secilenDep === 'Tümü' ? true : s.Departman === secilenDep)
+                    );
+                    return filtreli.length > 0 ? filtreli.map((s, i) => (
+                      <tr key={i}>
+                        <td style={styles.td}>{i + 1}</td>
+                        <td style={styles.td}>{s.Ad} {s.Soyad}</td>
+                        <td style={styles.td}>{s.Departman}</td>
+                        <td style={styles.td}>{s.Rol}</td>
+                        <td style={styles.td}>{s.OrtalamaToplamSkor ? s.OrtalamaToplamSkor.toFixed(2) : '-'}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan="5" style={{ ...styles.td, textAlign: 'center' }}>Henüz değerlendirme verisi bulunmuyor.</td></tr>
+                    );
+                  })()}
                 </tbody>
               </table>
             </div>

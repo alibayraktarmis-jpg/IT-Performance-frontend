@@ -15,9 +15,10 @@ function Login() {
       localStorage.setItem('ad', response.data.ad);
       localStorage.setItem('soyad', response.data.soyad);
       localStorage.setItem('id', response.data.id);
+      localStorage.setItem('departman', response.data.departman || '');
       window.location.href = '/dashboard';
     } catch (err) {
-      setHata('E-posta veya şifre hatalı. Lütfen tekrar deneyin.');
+      setHata(err.response?.data?.mesaj || 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.');
     }
   };
 

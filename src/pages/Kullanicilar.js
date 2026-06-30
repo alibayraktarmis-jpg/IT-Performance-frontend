@@ -6,10 +6,13 @@ function Kullanicilar() {
   const [kullanicilar, setKullanicilar] = useState([]);
   const [modalAcik, setModalAcik] = useState(false);
   const [yeniKullanici, setYeniKullanici] = useState({
-    ad: '', soyad: '', email: '', sifre: '', rol: 'Employee', departman: ''
+    ad: '', soyad: '', email: '', sifre: '', rol: 'Employee', departman: '', evaluatorId: null
   });
+  const evaluatorlar = kullanicilar.filter(k => k.rol === 'Evaluator');
   const [hata, setHata] = useState('');
   const [basari, setBasari] = useState('');
+  const [duzenleModalAcik, setDuzenleModalAcik] = useState(false);
+  const [duzenlenecek, setDuzenlenecek] = useState(null);
 
   useEffect(() => {
     kullanicilariGetir();
@@ -43,6 +46,21 @@ function Kullanicilar() {
       });
       kullanicilariGetir();
     } catch {}
+  };
+
+  const kullaniciGuncelle = async (e) => {
+    e.preventDefault();
+    try {
+      await api.put(`/Kullanicilar/${duzenlenecek.id}`, duzenlenecek);
+      setBasari('Kullanıcı başarıyla güncellendi.');
+      setHata('');
+      setDuzenleModalAcik(false);
+      setDuzenlenecek(null);
+      kullanicilariGetir();
+    } catch {
+      setHata('Güncelleme sırasında hata oluştu.');
+      setBasari('');
+    }
   };
 
   const kullaniciSil = async (id) => {
@@ -112,6 +130,12 @@ function Kullanicilar() {
                   </td>
                   <td style={styles.td}>
                     <button
+                      onClick={() => { setDuzenlenecek({...k}); setDuzenleModalAcik(true); }}
+                      style={{ ...styles.islemButon, color: '#818cf8', borderColor: '#4f46e5' }}
+                    >
+                      Düzenle
+                    </button>
+                    <button
                       onClick={() => aktifPasifYap(k.id, k.aktifMi)}
                       style={styles.islemButon}
                     >
@@ -129,6 +153,69 @@ function Kullanicilar() {
             </tbody>
           </table>
         </div>
+
+        {duzenleModalAcik && duzenlenecek && (
+          <div style={styles.modalArkaplan}>
+            <div style={styles.modal}>
+              <h3 style={styles.modalBaslik}>Kullanıcı Düzenle</h3>
+              <form onSubmit={kullaniciGuncelle}>
+                <div style={styles.formGrid}>
+                  <div style={styles.inputGroup}>
+                    <label style={styles.label}>Ad</label>
+                    <input style={styles.input} value={duzenlenecek.ad || ''}
+                      onChange={e => setDuzenlenecek({...duzenlenecek, ad: e.target.value})} required />
+                  </div>
+                  <div style={styles.inputGroup}>
+                    <label style={styles.label}>Soyad</label>
+                    <input style={styles.input} value={duzenlenecek.soyad || ''}
+                      onChange={e => setDuzenlenecek({...duzenlenecek, soyad: e.target.value})} required />
+                  </div>
+                  <div style={styles.inputGroup}>
+                    <label style={styles.label}>Email</label>
+                    <input type="email" style={styles.input} value={duzenlenecek.email || ''}
+                      onChange={e => setDuzenlenecek({...duzenlenecek, email: e.target.value})} required />
+                  </div>
+                  <div style={styles.inputGroup}>
+                    <label style={styles.label}>Rol</label>
+                    <select style={styles.input} value={duzenlenecek.rol || 'Employee'}
+                      onChange={e => setDuzenlenecek({...duzenlenecek, rol: e.target.value})}>
+                      <option value="Employee">Employee</option>
+                      <option value="Evaluator">Evaluator</option>
+                      <option value="Admin">Admin</option>
+                    </select>
+                  </div>
+                  <div style={{ ...styles.inputGroup, gridColumn: '1 / -1' }}>
+                    <label style={styles.label}>Departman</label>
+                    <select style={styles.input} value={duzenlenecek.departman || ''}
+                      onChange={e => setDuzenlenecek({...duzenlenecek, departman: e.target.value})}>
+                      <option value="">Seçiniz</option>
+                      <option value="İş Analistleri">İş Analistleri</option>
+                      <option value="Yazılımcılar">Yazılımcılar</option>
+                      <option value="QA/Test Uzmanları">QA/Test Uzmanları</option>
+                      <option value="Yonetim">Yönetim</option>
+                    </select>
+                  </div>
+                  {duzenlenecek.rol === 'Employee' && (
+                    <div style={{ ...styles.inputGroup, gridColumn: '1 / -1' }}>
+                      <label style={styles.label}>Değerlendirici</label>
+                      <select style={styles.input} value={duzenlenecek.evaluatorId || ''}
+                        onChange={e => setDuzenlenecek({...duzenlenecek, evaluatorId: e.target.value ? parseInt(e.target.value) : null})}>
+                        <option value="">Seçiniz</option>
+                        {evaluatorlar.map(ev => (
+                          <option key={ev.id} value={ev.id}>{ev.ad} {ev.soyad} — {ev.departman}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <div style={styles.modalButonlar}>
+                  <button type="button" onClick={() => { setDuzenleModalAcik(false); setDuzenlenecek(null); }} style={styles.iptalButon}>İptal</button>
+                  <button type="submit" style={styles.kaydetButon}>Güncelle</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {modalAcik && (
           <div style={styles.modalArkaplan}>
@@ -167,9 +254,31 @@ function Kullanicilar() {
                   </div>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Departman</label>
-                    <input style={styles.input} value={yeniKullanici.departman}
-                      onChange={e => setYeniKullanici({...yeniKullanici, departman: e.target.value})} required />
+                    <select style={styles.input} value={yeniKullanici.departman}
+                      onChange={e => {
+                        const dep = e.target.value;
+                        const otomatikEv = evaluatorlar.find(ev => ev.departman === dep);
+                        setYeniKullanici({...yeniKullanici, departman: dep, evaluatorId: otomatikEv ? otomatikEv.id : null});
+                      }} required>
+                      <option value="">Seçiniz</option>
+                      <option value="İş Analistleri">İş Analistleri</option>
+                      <option value="Yazılımcılar">Yazılımcılar</option>
+                      <option value="QA/Test Uzmanları">QA/Test Uzmanları</option>
+                      <option value="Yonetim">Yönetim</option>
+                    </select>
                   </div>
+                  {yeniKullanici.rol === 'Employee' && (
+                    <div style={{ ...styles.inputGroup, gridColumn: '1 / -1' }}>
+                      <label style={styles.label}>Değerlendirici</label>
+                      <select style={styles.input} value={yeniKullanici.evaluatorId || ''}
+                        onChange={e => setYeniKullanici({...yeniKullanici, evaluatorId: e.target.value ? parseInt(e.target.value) : null})}>
+                        <option value="">Seçiniz</option>
+                        {evaluatorlar.map(ev => (
+                          <option key={ev.id} value={ev.id}>{ev.ad} {ev.soyad} — {ev.departman}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
                 <div style={styles.modalButonlar}>
                   <button type="button" onClick={() => setModalAcik(false)} style={styles.iptalButon}>İptal</button>
