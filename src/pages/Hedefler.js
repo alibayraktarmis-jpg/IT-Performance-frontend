@@ -88,7 +88,8 @@ function Hedefler() {
   };
 
   const bugun = new Date();
-  const aktifHedefler = hedefler.filter(h => !(h.TamamlandiMi ?? h.tamamlandiMi));
+  const aktifHedefler = hedefler.filter(h => !(h.TamamlandiMi ?? h.tamamlandiMi) && new Date(h.BitisTarihi ?? h.bitisTarihi) >= bugun);
+  const suresiGecmis = hedefler.filter(h => !(h.TamamlandiMi ?? h.tamamlandiMi) && new Date(h.BitisTarihi ?? h.bitisTarihi) < bugun);
   const tamamlananlar = hedefler.filter(h => h.TamamlandiMi ?? h.tamamlandiMi);
 
   const HedefKart = ({ h }) => {
@@ -96,54 +97,57 @@ function Hedefler() {
     const bitis = new Date(h.BitisTarihi ?? h.bitisTarihi);
     const gecti = !tamamlandi && bitis < bugun;
     const kalan = Math.ceil((bitis - bugun) / (1000 * 60 * 60 * 24));
+    const [hovBtn, setHovBtn] = React.useState(null);
+
+    const solCizgi = tamamlandi ? '#166534' : gecti ? '#ef4444' : 'transparent';
 
     return (
       <div style={{
         backgroundColor: '#1c1c1c',
         borderRadius: '8px',
         padding: '16px 20px',
-        border: `1px solid ${tamamlandi ? '#166534' : gecti ? '#991b1b' : '#2a2a2a'}`,
+        border: '1px solid #2a2a2a',
+        borderLeft: `4px solid ${solCizgi}`,
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
         gap: '16px'
       }}>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           {(rol === 'Admin' || rol === 'Evaluator') && (
-            <div style={{ fontSize: '12px', color: '#a0a0a0', marginBottom: '4px' }}>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>
               {h.Ad ?? h.ad} {h.Soyad ?? h.soyad} · {h.Departman ?? h.departman}
             </div>
           )}
           <div style={{
-            fontSize: '14px',
-            color: tamamlandi ? '#a0a0a0' : '#e0e0e0',
+            fontSize: '15px',
+            fontWeight: '500',
+            color: tamamlandi ? '#6b7280' : '#f3f4f6',
             textDecoration: tamamlandi ? 'line-through' : 'none',
-            marginBottom: '8px',
-            lineHeight: '1.5'
+            marginBottom: '10px',
+            lineHeight: '1.6'
           }}>
             {h.Aciklama ?? h.aciklama}
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', color: gecti ? '#f87171' : tamamlandi ? '#4ade80' : '#a0a0a0' }}>
+            <span style={{ fontSize: '12px', color: gecti ? '#f87171' : tamamlandi ? '#4ade80' : '#9ca3af' }}>
               {tamamlandi ? 'Tamamlandı' : gecti ? `${Math.abs(kalan)} gün geçti` : kalan === 0 ? 'Bugün bitiyor' : `${kalan} gün kaldı`}
             </span>
-            <span style={{ fontSize: '12px', color: '#666' }}>
+            <span style={{ fontSize: '12px', color: '#4b5563' }}>
               Bitiş: {bitis.toLocaleDateString('tr-TR')}
             </span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
           <button
             onClick={() => tamamla(h.Id ?? h.id, tamamlandi)}
+            onMouseEnter={() => setHovBtn('tamam')}
+            onMouseLeave={() => setHovBtn(null)}
             style={{
-              padding: '6px 14px',
-              borderRadius: '6px',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: '500',
-              backgroundColor: tamamlandi ? '#2a2a2a' : '#166534',
-              color: tamamlandi ? '#a0a0a0' : '#4ade80'
+              padding: '6px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '500',
+              backgroundColor: hovBtn === 'tamam' ? (tamamlandi ? 'rgba(255,255,255,0.07)' : 'rgba(74,222,128,0.12)') : 'transparent',
+              color: tamamlandi ? '#6b7280' : '#4ade80',
+              transition: 'background-color 0.15s',
             }}
           >
             {tamamlandi ? 'Geri Al' : 'Tamamlandı'}
@@ -152,13 +156,27 @@ function Hedefler() {
             <>
               <button
                 onClick={() => duzenleAc(h)}
-                style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #4f46e5', cursor: 'pointer', fontSize: '13px', backgroundColor: 'transparent', color: '#818cf8' }}
+                onMouseEnter={() => setHovBtn('duzenle')}
+                onMouseLeave={() => setHovBtn(null)}
+                style={{
+                  padding: '6px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '12px',
+                  backgroundColor: hovBtn === 'duzenle' ? 'rgba(79,70,229,0.15)' : 'transparent',
+                  color: hovBtn === 'duzenle' ? '#a5b4fc' : '#818cf8',
+                  transition: 'background-color 0.15s',
+                }}
               >
                 Düzenle
               </button>
               <button
                 onClick={() => sil(h.Id ?? h.id)}
-                style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', backgroundColor: '#2a2a2a', color: '#f87171' }}
+                onMouseEnter={() => setHovBtn('sil')}
+                onMouseLeave={() => setHovBtn(null)}
+                style={{
+                  padding: '6px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '12px',
+                  backgroundColor: hovBtn === 'sil' ? 'rgba(239,68,68,0.12)' : 'transparent',
+                  color: hovBtn === 'sil' ? '#ef4444' : 'rgba(248,113,113,0.7)',
+                  transition: 'background-color 0.15s',
+                }}
               >
                 Sil
               </button>
@@ -190,11 +208,23 @@ function Hedefler() {
           </div>
           {aktifHedefler.length === 0
             ? <div style={styles.bos}>Aktif hedef bulunmuyor.</div>
-            : <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: '10px' }}>
                 {aktifHedefler.map((h, i) => <HedefKart key={i} h={h} />)}
               </div>
           }
         </div>
+
+        {suresiGecmis.length > 0 && (
+          <div style={styles.bolum}>
+            <div style={styles.bolumBaslik}>
+              Süresi Geçmiş
+              <span style={{ ...styles.sayi, backgroundColor: '#7f1d1d', color: '#f87171' }}>{suresiGecmis.length}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: '10px' }}>
+              {suresiGecmis.map((h, i) => <HedefKart key={i} h={h} />)}
+            </div>
+          </div>
+        )}
 
         {tamamlananlar.length > 0 && (
           <div style={styles.bolum}>
@@ -202,7 +232,7 @@ function Hedefler() {
               Tamamlananlar
               <span style={{ ...styles.sayi, backgroundColor: '#166534', color: '#4ade80' }}>{tamamlananlar.length}</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: '10px' }}>
               {tamamlananlar.map((h, i) => <HedefKart key={i} h={h} />)}
             </div>
           </div>

@@ -70,7 +70,7 @@ function Gecmis() {
                         onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2a2a2a'}
                         onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
                         <td style={styles.td}><span style={styles.donemBadge}>{d.Donem || d.donem}</span></td>
-                        <td style={styles.td}>{d.Tarih ? new Date(d.Tarih).toLocaleDateString('tr-TR') : '-'}</td>
+                        <td style={styles.td}>{(() => { const t = d.Tarih || d.tarih; return t && !t.startsWith('0001') ? new Date(t).toLocaleDateString('tr-TR') : '-'; })()}</td>
                         <td style={styles.td}><span style={{ fontWeight: '700', fontSize: '15px', color: skorRenk(skor) }}>{skor != null ? parseFloat(skor).toFixed(1) : '-'}</span></td>
                         <td style={{ ...styles.td, color: '#a0a0a0', fontSize: '13px' }}>{d.Yorum || d.yorum || '-'}</td>
                       </tr>
@@ -87,6 +87,12 @@ function Gecmis() {
 
   return (
     <div style={styles.sayfa}>
+      <style>{`
+        .calisan-scroll::-webkit-scrollbar { width: 6px; }
+        .calisan-scroll::-webkit-scrollbar-track { background: transparent; }
+        .calisan-scroll::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 99px; }
+        .calisan-scroll::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
+      `}</style>
       <Sidebar />
       <div style={styles.icerik}>
         <div style={{ marginBottom: '28px', borderBottom: '1px solid #2a2a2a', paddingBottom: '20px' }}>
@@ -112,7 +118,7 @@ function Gecmis() {
                 }}>{dep === 'Tümü' ? 'Tümü' : dep === 'İş Analistleri' ? 'Analist' : dep === 'Yazılımcılar' ? 'Yazılımcı' : 'QA'}</button>
               ))}
             </div>
-            <div style={styles.calisanListesi}>
+            <div className="calisan-scroll" style={styles.calisanListesi}>
               {filtreliCalisanlar.length === 0 ? (
                 <div style={{ padding: '16px', color: '#555', fontSize: '13px' }}>Sonuç bulunamadı</div>
               ) : filtreliCalisanlar.map((c, i) => {
@@ -144,7 +150,11 @@ function Gecmis() {
           <div style={{ flex: 1 }}>
             {!secilenCalisan ? (
               <div style={styles.bosSecim}>
-                <div style={{ color: '#aaa', fontSize: '14px' }}>Geçmişini görüntülemek için sol listeden bir çalışan seçin</div>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#2d2d2d', marginBottom: '16px' }}>
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                <div style={{ color: '#4b5563', fontSize: '14px' }}>Geçmişini görüntülemek için sol listeden bir çalışan seçin</div>
               </div>
             ) : (
               <>
@@ -182,7 +192,7 @@ function Gecmis() {
                               onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2a2a2a'}
                               onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
                               <td style={styles.td}><span style={styles.donemBadge}>{d.Donem || d.donem}</span></td>
-                              <td style={styles.td}>{d.Tarih ? new Date(d.Tarih).toLocaleDateString('tr-TR') : '-'}</td>
+                              <td style={styles.td}>{(() => { const t = d.Tarih || d.tarih; return t && !t.startsWith('0001') ? new Date(t).toLocaleDateString('tr-TR') : '-'; })()}</td>
                               <td style={styles.td}><span style={{ fontWeight: '700', fontSize: '15px', color: skorRenk(skor) }}>{skor != null ? parseFloat(skor).toFixed(1) : '-'}</span></td>
                               <td style={{ ...styles.td, color: '#a0a0a0', fontSize: '13px' }}>{d.Yorum || d.yorum || '-'}</td>
                             </tr>
@@ -212,10 +222,10 @@ const styles = {
   avatarBuyuk: { width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#2a2a3a', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '600', flexShrink: 0 },
   kart: { backgroundColor: '#242424', borderRadius: '8px', border: '1px solid #2a2a2a', overflow: 'hidden' },
   tablo: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '12px 16px', fontSize: '11px', color: '#a0a0a0', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #333' },
-  td: { padding: '14px 16px', fontSize: '14px', color: '#e0e0e0', borderBottom: '1px solid #2a2a2a' },
+  th: { textAlign: 'left', padding: '12px 16px', fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #333', backgroundColor: 'rgba(255,255,255,0.03)' },
+  td: { padding: '18px 16px', fontSize: '14px', color: '#e0e0e0', borderBottom: '1px solid #2a2a2a' },
   satir: { transition: 'background 0.1s' },
-  donemBadge: { padding: '3px 10px', backgroundColor: '#2a2a3a', color: '#818cf8', borderRadius: '12px', fontSize: '12px', fontWeight: '500' },
+  donemBadge: { padding: '3px 8px', backgroundColor: 'rgba(255,255,255,0.06)', color: '#d1d5db', borderRadius: '5px', fontSize: '12px', fontWeight: '500' },
   bos: { padding: '32px', textAlign: 'center', color: '#555', fontSize: '14px' },
   bosSecim: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', backgroundColor: '#242424', borderRadius: '8px', border: '1px solid #2a2a2a', color: '#888', fontSize: '14px' },
 };

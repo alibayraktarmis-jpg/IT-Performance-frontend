@@ -1,8 +1,87 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
+function CustomSelect({ value, onChange, gruplar, placeholder = 'Seçin...' }) {
+  const [acik, setAcik] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const kapat = (e) => { if (ref.current && !ref.current.contains(e.target)) setAcik(false); };
+    document.addEventListener('mousedown', kapat);
+    return () => document.removeEventListener('mousedown', kapat);
+  }, []);
+
+  const tumSecenekler = gruplar.flatMap(g => g.secenekler);
+  const secilenEtiket = value ? (tumSecenekler.find(s => s.value === value)?.label ?? value) : placeholder;
+
+  return (
+    <div ref={ref} style={{ position: 'relative', minWidth: '180px' }}>
+      <button
+        type="button"
+        onClick={() => setAcik(a => !a)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+          padding: '9px 14px', backgroundColor: '#1e1e1e', color: value ? '#f3f4f6' : '#6b7280',
+          border: `1px solid ${acik ? '#4f46e5' : '#3a3a3a'}`, borderRadius: '6px',
+          fontSize: '13px', cursor: 'pointer',
+          boxShadow: acik ? '0 0 0 3px rgba(79,70,229,0.2)' : 'none',
+          transition: 'border-color 0.15s, box-shadow 0.15s',
+        }}
+      >
+        <span>{secilenEtiket}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          style={{ flexShrink: 0, transform: acik ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+
+      {acik && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 200,
+          backgroundColor: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.5)', overflow: 'hidden', maxHeight: '260px', overflowY: 'auto',
+        }}>
+          <div
+            onClick={() => { onChange(''); setAcik(false); }}
+            style={{
+              padding: '9px 14px', fontSize: '13px', cursor: 'pointer',
+              color: !value ? '#818cf8' : '#9ca3af',
+              backgroundColor: !value ? 'rgba(79,70,229,0.1)' : 'transparent',
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = !value ? 'rgba(79,70,229,0.1)' : 'transparent'}
+          >
+            {placeholder}
+          </div>
+          {gruplar.map(g => (
+            <div key={g.label}>
+              <div style={{ padding: '6px 14px 4px', fontSize: '10px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '600' }}>
+                {g.label}
+              </div>
+              {g.secenekler.map(s => (
+                <div
+                  key={s.value}
+                  onClick={() => { onChange(s.value); setAcik(false); }}
+                  style={{
+                    padding: '9px 14px 9px 20px', fontSize: '13px', cursor: 'pointer',
+                    color: value === s.value ? '#818cf8' : '#d1d5db',
+                    backgroundColor: value === s.value ? 'rgba(79,70,229,0.12)' : 'transparent',
+                  }}
+                  onMouseEnter={e => { if (value !== s.value) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = value === s.value ? 'rgba(79,70,229,0.12)' : 'transparent'; }}
+                >
+                  {s.label}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 function Raporlar() {
   const [siralama, setSiralama] = useState([]);
   const [skorDetay, setSkorDetay] = useState(null);
@@ -79,6 +158,8 @@ function Raporlar() {
   const [sonDonem, setSonDonem] = useState('');
   const [calisanDonemleri, setCalisanDonemleri] = useState([]);
   const [panelDonem, setPanelDonem] = useState('');
+  const [hovExcel, setHovExcel] = useState(false);
+  const [hovPdf, setHovPdf] = useState(false);
 
   const donemeSkorGetir = (calisanId, donem) => {
     setPanelDonem(donem);
@@ -133,6 +214,9 @@ function Raporlar() {
 
   return (
     <div style={styles.sayfa}>
+      <style>{`
+        .rapor-select:focus { outline: none; border-color: #4f46e5 !important; box-shadow: 0 0 0 3px rgba(79,70,229,0.2); }
+      `}</style>
       <Sidebar />
       <div style={styles.icerik}>
         <div style={styles.topBar}>
@@ -142,32 +226,47 @@ function Raporlar() {
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             {rol !== 'Employee' && donemler.length > 0 && (
-              <select
+              <CustomSelect
                 value={secilenDonem}
-                onChange={e => donemDegistir(e.target.value)}
-                style={styles.donemSelect}
-              >
-                <option value="">Tüm Dönemler</option>
-                {Object.entries(
+                onChange={donemDegistir}
+                placeholder="Tüm Dönemler"
+                gruplar={Object.entries(
                   donemler.reduce((acc, d) => {
                     const yil = d.split(' ')[0];
                     if (!acc[yil]) acc[yil] = [];
                     acc[yil].push(d);
                     return acc;
                   }, {})
-                ).sort(([a], [b]) => b - a).map(([yil, yilDonemler]) => (
-                  <optgroup key={yil} label={`── ${yil}`}>
-                    {yilDonemler.map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+                ).sort(([a], [b]) => b - a).map(([yil, yilDonemler]) => ({
+                  label: yil,
+                  secenekler: yilDonemler.map(d => ({ value: d, label: d }))
+                }))}
+              />
             )}
             {rol === 'Admin' && (
               <>
-                <button onClick={() => dosyaIndir('excel', 'PerformansRaporu.xlsx')} style={styles.excelButon}>Excel İndir</button>
-                <button onClick={() => dosyaIndir('pdf', 'PerformansRaporu.pdf')} style={styles.pdfButon}>PDF İndir</button>
+                <button
+                  onClick={() => dosyaIndir('excel', 'PerformansRaporu.xlsx')}
+                  onMouseEnter={() => setHovExcel(true)}
+                  onMouseLeave={() => setHovExcel(false)}
+                  style={{ ...styles.excelButon, backgroundColor: hovExcel ? 'rgba(74,222,128,0.2)' : 'rgba(74,222,128,0.08)' }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Excel
+                </button>
+                <button
+                  onClick={() => dosyaIndir('pdf', 'PerformansRaporu.pdf')}
+                  onMouseEnter={() => setHovPdf(true)}
+                  onMouseLeave={() => setHovPdf(false)}
+                  style={{ ...styles.pdfButon, backgroundColor: hovPdf ? 'rgba(248,113,113,0.2)' : 'rgba(248,113,113,0.08)' }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                  PDF
+                </button>
               </>
             )}
           </div>
@@ -185,8 +284,9 @@ function Raporlar() {
                   contentStyle={{ backgroundColor: '#242424', border: '1px solid #333', borderRadius: '6px' }}
                   labelStyle={{ color: '#fff' }}
                   formatter={(val) => [`${val}`, 'Skor']}
+                  cursor={false}
                 />
-                <Bar dataKey="skor" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="skor" radius={[4, 4, 0, 0]} activeBar={false}>
                   {grafikVerisi.map((_, i) => (
                     <Cell
                       key={i}
@@ -249,14 +349,14 @@ function Raporlar() {
                     <th style={styles.th}>#</th>
                     <th style={styles.th}>Ad Soyad</th>
                     <th style={styles.th}>Departman</th>
-                    <th style={styles.th}>Ortalama Skor</th>
+                    <th style={{ ...styles.th, textAlign: 'right' }}>Ortalama Skor</th>
                   </tr>
                 </thead>
                 <tbody>
                   {siralama.map((s, i) => (
                     <tr
                       key={i}
-                      style={{ ...styles.satir, backgroundColor: secilenCalisan === s.Id ? '#2a2a3a' : 'transparent' }}
+                      style={{ ...styles.satir, backgroundColor: secilenCalisan === s.Id ? 'rgba(79,70,229,0.1)' : 'transparent' }}
                       onClick={() => {
                         if (secilenCalisan === s.Id) {
                           setSecilenCalisan('');
@@ -269,20 +369,20 @@ function Raporlar() {
                           calisanSkorGetir(s.Id);
                         }
                       }}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2a2a2a'}
-                      onMouseLeave={e => e.currentTarget.style.backgroundColor = secilenCalisan === s.Id ? '#2a2a3a' : 'transparent'}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = secilenCalisan === s.Id ? 'rgba(79,70,229,0.15)' : '#2a2a2a'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = secilenCalisan === s.Id ? 'rgba(79,70,229,0.1)' : 'transparent'}
                     >
-                      <td style={styles.td}>
+                      <td style={{ ...styles.td, borderLeft: secilenCalisan === s.Id ? '3px solid #4f46e5' : '3px solid transparent' }}>
                         <span style={{ ...styles.siraNo, backgroundColor: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : '#2a2a2a' }}>
                           {i + 1}
                         </span>
                       </td>
-                      <td style={{ ...styles.td, color: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : '#e0e0e0', fontWeight: i < 3 ? '600' : '400' }}>
+                      <td style={{ ...styles.td, fontWeight: i < 3 ? '600' : '400' }}>
                         {s.Ad} {s.Soyad}
                       </td>
                       <td style={styles.td}>{s.Departman}</td>
-                      <td style={styles.td}>
-                        <span style={{ ...styles.skorText, color: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : '#4f46e5' }}>
+                      <td style={{ ...styles.td, textAlign: 'right' }}>
+                        <span style={styles.skorText}>
                           {s.OrtalamaToplamSkor ? s.OrtalamaToplamSkor.toFixed(2) : '-'}
                         </span>
                       </td>
@@ -301,7 +401,8 @@ function Raporlar() {
                   <select
                     value={panelDonem}
                     onChange={e => donemeSkorGetir(secilenCalisan, e.target.value)}
-                    style={{ padding: '6px 10px', backgroundColor: '#141414', border: '1px solid #333', borderRadius: '6px', color: '#fff', fontSize: '13px', cursor: 'pointer' }}
+                    className="rapor-select"
+                    style={{ padding: '4px 8px', backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '6px', color: '#d1d5db', fontSize: '12px', cursor: 'pointer' }}
                   >
                     {calisanDonemleri.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
@@ -330,14 +431,14 @@ function Raporlar() {
               ) : (
                 <div style={{ color: '#a0a0a0', fontSize: '13px', marginBottom: '16px' }}>Skor verisi bulunamadı.</div>
               )}
-              <div style={{ marginTop: '16px', borderTop: '1px solid #333', paddingTop: '12px', display: 'flex', gap: '16px' }}>
-                {sonDonem && <div><div style={{ fontSize: '11px', color: '#a0a0a0', marginBottom: '2px' }}>DÖNEM</div><div style={{ fontSize: '13px', color: '#e0e0e0' }}>{sonDonem}</div></div>}
-                {sonTarih && <div><div style={{ fontSize: '11px', color: '#a0a0a0', marginBottom: '2px' }}>TARİH</div><div style={{ fontSize: '13px', color: '#e0e0e0' }}>{sonTarih}</div></div>}
+              <div style={{ marginTop: '24px', borderTop: '1px solid #2a2a2a', paddingTop: '20px', display: 'flex', gap: '24px' }}>
+                {sonDonem && <div><div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '4px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Dönem</div><div style={{ fontSize: '14px', color: '#e0e0e0', fontWeight: '500' }}>{sonDonem}</div></div>}
+                {sonTarih && <div><div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '4px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Tarih</div><div style={{ fontSize: '14px', color: '#e0e0e0', fontWeight: '500' }}>{sonTarih}</div></div>}
               </div>
               {sonYorum && (
-                <div style={{ marginTop: '12px' }}>
-                  <div style={{ fontSize: '11px', color: '#a0a0a0', marginBottom: '4px' }}>YORUM</div>
-                  <div style={{ fontSize: '13px', color: '#e0e0e0', lineHeight: '1.5' }}>{sonYorum}</div>
+                <div style={{ marginTop: '20px' }}>
+                  <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Yorum</div>
+                  <div style={{ fontSize: '13px', color: '#d1d5db', lineHeight: '1.65', padding: '12px 14px', backgroundColor: '#1c1c1c', borderRadius: '6px', borderLeft: '2px solid #374151' }}>{sonYorum}</div>
                 </div>
               )}
               {!sonDonem && !sonTarih && !sonYorum && !skorDetay && (
@@ -357,9 +458,9 @@ const styles = {
   topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', borderBottom: '1px solid #2a2a2a', paddingBottom: '20px' },
   baslik: { fontSize: '24px', fontWeight: '600', color: '#ffffff', margin: '0 0 6px' },
   altBaslik: { fontSize: '14px', color: '#a0a0a0', margin: 0 },
-  excelButon: { padding: '10px 20px', backgroundColor: 'transparent', color: '#4ade80', border: '1px solid #166534', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
-  pdfButon: { padding: '10px 20px', backgroundColor: 'transparent', color: '#f87171', border: '1px solid #991b1b', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
-  donemSelect: { padding: '10px 14px', backgroundColor: '#242424', color: '#fff', border: '1px solid #333', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' },
+  excelButon: { display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 16px', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', color: '#4ade80', transition: 'background-color 0.15s' },
+  pdfButon: { display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 16px', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', color: '#f87171', transition: 'background-color 0.15s' },
+  donemSelect: { padding: '9px 14px', backgroundColor: '#1e1e1e', color: '#f3f4f6', border: '1px solid #3a3a3a', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', transition: 'border-color 0.15s' },
   kart: { backgroundColor: '#242424', borderRadius: '8px', padding: '24px', border: '1px solid #2a2a2a', marginBottom: '16px' },
   kartBaslik: { fontSize: '15px', fontWeight: '600', color: '#fff', marginBottom: '0' },
   tabloEl: { width: '100%', borderCollapse: 'collapse' },
@@ -367,15 +468,15 @@ const styles = {
   td: { padding: '12px 12px', fontSize: '14px', color: '#e0e0e0', borderBottom: '1px solid #2a2a2a', cursor: 'pointer' },
   satir: { transition: 'background 0.1s' },
   siraNo: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', fontSize: '12px', fontWeight: '600', color: '#fff' },
-  skorText: { fontWeight: '600', color: '#4f46e5' },
-  skorBuyuk: { fontSize: '48px', fontWeight: '700', color: '#4f46e5', textAlign: 'center', marginBottom: '4px' },
-  skorAlt: { fontSize: '13px', color: '#a0a0a0', textAlign: 'center', marginBottom: '24px' },
-  kategoriListesi: { display: 'flex', flexDirection: 'column', gap: '12px' },
+  skorText: { fontWeight: '500', color: '#e0e0e0' },
+  skorBuyuk: { fontSize: '48px', fontWeight: '700', color: '#4f46e5', textAlign: 'center', marginBottom: '4px', marginTop: '8px' },
+  skorAlt: { fontSize: '13px', color: '#a0a0a0', textAlign: 'center', marginBottom: '28px' },
+  kategoriListesi: { display: 'flex', flexDirection: 'column', gap: '16px' },
   kategoriSatir: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' },
   kategoriAdi: { fontSize: '13px', color: '#e0e0e0', minWidth: '120px' },
   kategoriSag: { display: 'flex', alignItems: 'center', gap: '10px', flex: 1 },
-  barContainer: { flex: 1, height: '6px', backgroundColor: '#333', borderRadius: '3px', overflow: 'hidden' },
-  bar: { height: '100%', backgroundColor: '#4f46e5', borderRadius: '3px' },
+  barContainer: { flex: 1, height: '10px', backgroundColor: '#2a2a2a', borderRadius: '99px', overflow: 'hidden' },
+  bar: { height: '100%', backgroundColor: '#4f46e5', borderRadius: '99px' },
   kategoriPuan: { fontSize: '13px', color: '#a0a0a0', minWidth: '30px', textAlign: 'right' },
 };
 

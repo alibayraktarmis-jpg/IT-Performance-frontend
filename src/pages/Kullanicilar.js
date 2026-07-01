@@ -2,6 +2,31 @@ import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
 
+function IslemBtn({ onClick, children, variant = 'default' }) {
+  const [hov, setHov] = React.useState(false);
+  const renkler = {
+    default: { normal: '#9ca3af', bg: 'rgba(255,255,255,0.07)', hov: '#e5e7eb' },
+    primary: { normal: '#818cf8', bg: 'rgba(79,70,229,0.15)', hov: '#a5b4fc' },
+    danger:  { normal: 'rgba(248,113,113,0.75)', bg: 'rgba(239,68,68,0.12)', hov: '#ef4444' },
+  }[variant];
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        padding: '5px 10px', border: 'none', borderRadius: '6px',
+        fontSize: '12px', cursor: 'pointer',
+        transition: 'background-color 0.15s, color 0.15s',
+        backgroundColor: hov ? renkler.bg : 'transparent',
+        color: hov ? renkler.hov : renkler.normal,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function Kullanicilar() {
   const [kullanicilar, setKullanicilar] = useState([]);
   const [modalAcik, setModalAcik] = useState(false);
@@ -11,6 +36,7 @@ function Kullanicilar() {
   const evaluatorlar = kullanicilar.filter(k => k.rol === 'Evaluator');
   const [hata, setHata] = useState('');
   const [basari, setBasari] = useState('');
+  const [aramaMetni, setAramaMetni] = useState('');
   const [duzenleModalAcik, setDuzenleModalAcik] = useState(false);
   const [duzenlenecek, setDuzenlenecek] = useState(null);
 
@@ -73,6 +99,13 @@ function Kullanicilar() {
 
   return (
     <div style={styles.sayfa}>
+      <style>{`
+        .kul-input:focus {
+          outline: none;
+          border-color: #4f46e5 !important;
+          box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+        }
+      `}</style>
       <Sidebar />
       <div style={styles.icerik}>
         <div style={styles.topBar}>
@@ -80,13 +113,32 @@ function Kullanicilar() {
             <h2 style={styles.baslik}>Kullanıcılar</h2>
             <p style={styles.altBaslik}>Sistemdeki tüm kullanıcıları yönetin</p>
           </div>
-          <button onClick={() => setModalAcik(true)} style={styles.ekleButon}>
-            + Yeni Kullanıcı
-          </button>
         </div>
 
         {basari && <div style={styles.basariKutusu}>{basari}</div>}
         {hata && <div style={styles.hataKutusu}>{hata}</div>}
+
+        {/* Arama + Eylem Satırı */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '16px' }}>
+          <div style={{ position: 'relative', width: '288px' }}>
+            <svg
+              style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6b7280' }}
+              width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            >
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              className="kul-input"
+              style={{ ...styles.aramaInput }}
+              placeholder="İsim ara..."
+              value={aramaMetni}
+              onChange={e => setAramaMetni(e.target.value)}
+            />
+          </div>
+          <button onClick={() => setModalAcik(true)} style={styles.ekleButon}>
+            + Yeni Kullanıcı
+          </button>
+        </div>
 
         <div style={styles.tablo}>
           <table style={styles.tabloEl}>
@@ -101,7 +153,10 @@ function Kullanicilar() {
               </tr>
             </thead>
             <tbody>
-              {kullanicilar.map((k) => (
+              {kullanicilar.filter(k => {
+                const q = aramaMetni.toLowerCase();
+                return !q || `${k.ad} ${k.soyad}`.toLowerCase().includes(q);
+              }).map((k) => (
                 <tr key={k.id} style={styles.satir}>
                   <td style={styles.td}>
                     <div style={styles.isimKismi}>
@@ -113,12 +168,12 @@ function Kullanicilar() {
                   <td style={styles.td}>
                     <span style={{
                       ...styles.rolBadge,
-                      backgroundColor: k.rol === 'Admin' ? '#4f46e5' : k.rol === 'Evaluator' ? '#0891b2' : '#374151'
+                      backgroundColor: k.rol === 'Admin' ? '#4f46e5' : k.rol === 'Evaluator' ? '#0891b2' : '#475569'
                     }}>
                       {k.rol}
                     </span>
                   </td>
-                  <td style={styles.td}>{k.departman}</td>
+                  <td style={styles.td}>{k.departman || (k.rol === 'Admin' ? 'Yönetim' : '-')}</td>
                   <td style={styles.td}>
                     <span style={{
                       ...styles.durumBadge,
@@ -129,24 +184,13 @@ function Kullanicilar() {
                     </span>
                   </td>
                   <td style={styles.td}>
-                    <button
-                      onClick={() => { setDuzenlenecek({...k}); setDuzenleModalAcik(true); }}
-                      style={{ ...styles.islemButon, color: '#818cf8', borderColor: '#4f46e5' }}
-                    >
-                      Düzenle
-                    </button>
-                    <button
-                      onClick={() => aktifPasifYap(k.id, k.aktifMi)}
-                      style={styles.islemButon}
-                    >
-                      {k.aktifMi ? 'Pasif Yap' : 'Aktif Yap'}
-                    </button>
-                    <button
-                      onClick={() => kullaniciSil(k.id)}
-                      style={styles.silButon}
-                    >
-                      Sil
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      <IslemBtn variant="primary" onClick={() => { setDuzenlenecek({...k}); setDuzenleModalAcik(true); }}>Düzenle</IslemBtn>
+                      <span style={{ color: '#333', userSelect: 'none', fontSize: '13px' }}>|</span>
+                      <IslemBtn onClick={() => aktifPasifYap(k.id, k.aktifMi)}>{k.aktifMi ? 'Pasif Yap' : 'Aktif Yap'}</IslemBtn>
+                      <span style={{ color: '#333', userSelect: 'none', fontSize: '13px' }}>|</span>
+                      <IslemBtn variant="danger" onClick={() => kullaniciSil(k.id)}>Sil</IslemBtn>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -162,22 +206,22 @@ function Kullanicilar() {
                 <div style={styles.formGrid}>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Ad</label>
-                    <input style={styles.input} value={duzenlenecek.ad || ''}
+                    <input className="kul-input" style={styles.input} value={duzenlenecek.ad || ''}
                       onChange={e => setDuzenlenecek({...duzenlenecek, ad: e.target.value})} required />
                   </div>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Soyad</label>
-                    <input style={styles.input} value={duzenlenecek.soyad || ''}
+                    <input className="kul-input" style={styles.input} value={duzenlenecek.soyad || ''}
                       onChange={e => setDuzenlenecek({...duzenlenecek, soyad: e.target.value})} required />
                   </div>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Email</label>
-                    <input type="email" style={styles.input} value={duzenlenecek.email || ''}
+                    <input type="email" className="kul-input" style={styles.input} value={duzenlenecek.email || ''}
                       onChange={e => setDuzenlenecek({...duzenlenecek, email: e.target.value})} required />
                   </div>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Rol</label>
-                    <select style={styles.input} value={duzenlenecek.rol || 'Employee'}
+                    <select className="kul-input" style={styles.input} value={duzenlenecek.rol || 'Employee'}
                       onChange={e => setDuzenlenecek({...duzenlenecek, rol: e.target.value})}>
                       <option value="Employee">Employee</option>
                       <option value="Evaluator">Evaluator</option>
@@ -186,7 +230,7 @@ function Kullanicilar() {
                   </div>
                   <div style={{ ...styles.inputGroup, gridColumn: '1 / -1' }}>
                     <label style={styles.label}>Departman</label>
-                    <select style={styles.input} value={duzenlenecek.departman || ''}
+                    <select className="kul-input" style={styles.input} value={duzenlenecek.departman || ''}
                       onChange={e => setDuzenlenecek({...duzenlenecek, departman: e.target.value})}>
                       <option value="">Seçiniz</option>
                       <option value="İş Analistleri">İş Analistleri</option>
@@ -198,7 +242,7 @@ function Kullanicilar() {
                   {duzenlenecek.rol === 'Employee' && (
                     <div style={{ ...styles.inputGroup, gridColumn: '1 / -1' }}>
                       <label style={styles.label}>Değerlendirici</label>
-                      <select style={styles.input} value={duzenlenecek.evaluatorId || ''}
+                      <select className="kul-input" style={styles.input} value={duzenlenecek.evaluatorId || ''}
                         onChange={e => setDuzenlenecek({...duzenlenecek, evaluatorId: e.target.value ? parseInt(e.target.value) : null})}>
                         <option value="">Seçiniz</option>
                         {evaluatorlar.map(ev => (
@@ -235,17 +279,17 @@ function Kullanicilar() {
                   </div>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Email</label>
-                    <input type="email" style={styles.input} value={yeniKullanici.email}
+                    <input type="email" className="kul-input" style={styles.input} value={yeniKullanici.email}
                       onChange={e => setYeniKullanici({...yeniKullanici, email: e.target.value})} required />
                   </div>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Şifre</label>
-                    <input type="password" style={styles.input} value={yeniKullanici.sifre}
+                    <input type="password" className="kul-input" style={styles.input} value={yeniKullanici.sifre}
                       onChange={e => setYeniKullanici({...yeniKullanici, sifre: e.target.value})} required />
                   </div>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Rol</label>
-                    <select style={styles.input} value={yeniKullanici.rol}
+                    <select className="kul-input" style={styles.input} value={yeniKullanici.rol}
                       onChange={e => setYeniKullanici({...yeniKullanici, rol: e.target.value})}>
                       <option value="Employee">Employee</option>
                       <option value="Evaluator">Evaluator</option>
@@ -254,7 +298,7 @@ function Kullanicilar() {
                   </div>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Departman</label>
-                    <select style={styles.input} value={yeniKullanici.departman}
+                    <select className="kul-input" style={styles.input} value={yeniKullanici.departman}
                       onChange={e => {
                         const dep = e.target.value;
                         const otomatikEv = evaluatorlar.find(ev => ev.departman === dep);
@@ -270,7 +314,7 @@ function Kullanicilar() {
                   {yeniKullanici.rol === 'Employee' && (
                     <div style={{ ...styles.inputGroup, gridColumn: '1 / -1' }}>
                       <label style={styles.label}>Değerlendirici</label>
-                      <select style={styles.input} value={yeniKullanici.evaluatorId || ''}
+                      <select className="kul-input" style={styles.input} value={yeniKullanici.evaluatorId || ''}
                         onChange={e => setYeniKullanici({...yeniKullanici, evaluatorId: e.target.value ? parseInt(e.target.value) : null})}>
                         <option value="">Seçiniz</option>
                         {evaluatorlar.map(ev => (
@@ -318,7 +362,8 @@ const styles = {
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
   label: { fontSize: '13px', color: '#b3b3b3', fontWeight: '500' },
-  input: { padding: '10px 12px', backgroundColor: '#141414', border: '1px solid #333', borderRadius: '6px', color: '#fff', fontSize: '14px' },
+  aramaInput: { width: '100%', padding: '9px 12px 9px 38px', backgroundColor: '#1e1e1e', border: '1px solid #3a3a3a', borderRadius: '6px', color: '#f3f4f6', fontSize: '13px', boxSizing: 'border-box', transition: 'border-color 0.15s' },
+  input: { padding: '10px 12px', backgroundColor: '#1e1e1e', border: '1px solid #3a3a3a', borderRadius: '6px', color: '#f3f4f6', fontSize: '14px', transition: 'border-color 0.15s' },
   modalButonlar: { display: 'flex', justifyContent: 'flex-end', gap: '12px' },
   iptalButon: { padding: '10px 20px', backgroundColor: 'transparent', color: '#a0a0a0', border: '1px solid #333', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' },
   kaydetButon: { padding: '10px 20px', backgroundColor: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },

@@ -33,6 +33,7 @@ function Degerlendirme() {
   }
 
   useEffect(() => {
+    if (mevcutRol !== 'Admin') setSecilenDep(mevcutDepartman || '');
     api.get('/Kullanicilar').then(res => {
       setCalisanlar(res.data.filter(k => (k.rol || k.Rol) === 'Employee' && (k.aktifMi ?? k.AktifMi)));
     }).catch(() => {});
@@ -116,27 +117,7 @@ function Degerlendirme() {
     return Math.round(toplam * 100) / 100;
   };
 
-  const sonrakiCalisanaGec = () => {
-    const mevcutDep = calisanlar.find(c => String(c.id || c.Id) === secilenCalisan);
-    const depAdi = mevcutDep ? (mevcutDep.departman || mevcutDep.Departman) : '';
-    const depCalisanlar = calisanlar.filter(c => (c.departman || c.Departman) === depAdi);
-    const mevcutIndex = depCalisanlar.findIndex(c => String(c.id || c.Id) === secilenCalisan);
-    const sonraki = depCalisanlar[mevcutIndex + 1];
-    if (sonraki) {
-      const id = String(sonraki.id || sonraki.Id);
-      const isim = `${sonraki.ad || sonraki.Ad} ${sonraki.soyad || sonraki.Soyad}`;
-      setSecilenCalisan(id);
-      setSecilenCalisanRol(sonraki.departman || sonraki.Departman || '');
-      setAramaMetni(isim);
-      setPuanlar({});
-      setYorum('');
-      setBasari('');
-    } else {
-      setBasari(prev => prev + ' — Departmandaki tüm çalışanlar değerlendirildi!');
-    }
-  };
-
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
     if (!secilenCalisan) { setHata('Lütfen bir çalışan seçin.'); return; }
     if (!secilenDonem) { setHata('Lütfen bir dönem seçin.'); return; }
@@ -176,6 +157,7 @@ function Degerlendirme() {
         setBasari(`Değerlendirme kaydedildi. Toplam Skor: ${toplamSkor}`);
         setGuncellemeMode(true);
         setMevcutDegerlendirmeId(degerlendirmeId);
+        setCalisanDonemler(prev => [...prev, secilenDonem]);
       }
       setHata('');
     } catch {
@@ -208,9 +190,9 @@ function Degerlendirme() {
             <div style={styles.inputGroup}>
               <label style={styles.label}>Çalışan Seçin</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {/* Departman filtre butonları */}
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  {['İş Analistleri', 'Yazılımcılar', 'QA/Test Uzmanları'].filter(dep => mevcutRol === 'Admin' || dep === mevcutDepartman).map(dep => {
+                {/* Departman filtre butonları — sadece Admin'e göster */}
+                {mevcutRol === 'Admin' && <div style={{ display: 'flex', gap: '6px' }}>
+                  {['İş Analistleri', 'Yazılımcılar', 'QA/Test Uzmanları'].map(dep => {
                     const kisaAd = { 'İş Analistleri': 'İş Analisti', 'Yazılımcılar': 'Yazılımcı', 'QA/Test Uzmanları': 'QA/Test' };
                     const aktif = secilenDep === dep;
                     return (
@@ -225,7 +207,7 @@ function Degerlendirme() {
                         }}>{kisaAd[dep]}</button>
                     );
                   })}
-                </div>
+                </div>}
                 {/* Arama kutusu */}
                 <div style={{ position: 'relative' }}>
                   {secilenCalisan && (
@@ -451,22 +433,12 @@ function Degerlendirme() {
             <div style={styles.skorOnizleme}>
               Tahmini Toplam Skor: <strong>{toplamSkorHesapla()}</strong>
             </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="submit" style={{
-                ...styles.kaydetButon,
-                backgroundColor: 'transparent',
-                border: `1px solid ${guncellemeMode ? '#059669' : '#4f46e5'}`,
-                color: guncellemeMode ? '#059669' : '#818cf8',
-              }}>
-                {guncellemeMode ? 'Güncelle' : 'Kaydet'}
-              </button>
-              <button type="submit" onClick={() => { setTimeout(sonrakiCalisanaGec, 300); }} style={{
-                ...styles.kaydetButon,
-                backgroundColor: guncellemeMode ? '#059669' : '#4f46e5',
-              }}>
-                {guncellemeMode ? 'Güncelle ve Sonrakine Geç →' : 'Kaydet ve Sonrakine Geç →'}
-              </button>
-            </div>
+            <button type="submit" style={{
+              ...styles.kaydetButon,
+              backgroundColor: guncellemeMode ? '#059669' : '#4f46e5',
+            }}>
+              {guncellemeMode ? 'Güncelle' : 'Kaydet'}
+            </button>
           </div>
         </form>
       </div>

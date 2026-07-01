@@ -1,6 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
+const IconUsers = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+);
+const IconUserCheck = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/>
+    <polyline points="17 11 19 13 23 9"/>
+  </svg>
+);
+const IconBarChart = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+    <line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>
+  </svg>
+);
 
 function Dashboard() {
   const rol = localStorage.getItem('rol');
@@ -13,6 +31,7 @@ function Dashboard() {
   const [sonDegerlendirme, setSonDegerlendirme] = useState(null);
   const [employeeGrafik, setEmployeeGrafik] = useState([]);
   const [secilenDep, setSecilenDep] = useState('Tümü');
+  const [hoveredRow, setHoveredRow] = useState(null);
 
   useEffect(() => {
     api.get('/Degerlendirmeler/siralama').then(res => setSiralama(res.data)).catch(() => {});
@@ -142,17 +161,26 @@ function Dashboard() {
                 ? (degerlendirilen.reduce((a, b) => a + b.OrtalamaToplamSkor, 0) / degerlendirilen.length).toFixed(1)
                 : '-';
               return (
-                <div style={styles.kartGrid}>
+                <div style={{ ...styles.kartGrid, gridTemplateColumns: 'repeat(3, 1fr)' }}>
                   <div style={styles.kart}>
-                    <div style={styles.kartEtiket}>Toplam Çalışan</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={styles.kartEtiket}>Toplam Çalışan</div>
+                      <div style={styles.kartIkon}><IconUsers /></div>
+                    </div>
                     <div style={styles.kartDeger}>{depFiltreli.length}</div>
                   </div>
                   <div style={styles.kart}>
-                    <div style={styles.kartEtiket}>Değerlendirilen</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={styles.kartEtiket}>Değerlendirilen</div>
+                      <div style={styles.kartIkon}><IconUserCheck /></div>
+                    </div>
                     <div style={styles.kartDeger}>{degerlendirilen.length}</div>
                   </div>
                   <div style={styles.kart}>
-                    <div style={styles.kartEtiket}>Genel Ortalama</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={styles.kartEtiket}>{secilenDep === 'Tümü' ? 'Genel Ortalama' : `${secilenDep} Ortalaması`}</div>
+                      <div style={styles.kartIkon}><IconBarChart /></div>
+                    </div>
                     <div style={styles.kartDeger}>{ortalama}</div>
                   </div>
                 </div>
@@ -165,23 +193,19 @@ function Dashboard() {
                 {rol === 'Admin' && (
                   <div style={{ display: 'flex', gap: '8px' }}>
                     {['Tümü', 'İş Analistleri', 'Yazılımcılar', 'QA/Test Uzmanları'].map(dep => (
-                      <button key={dep} onClick={() => setSecilenDep(dep)} style={{
-                        padding: '6px 14px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '500',
-                        backgroundColor: secilenDep === dep ? '#4f46e5' : '#2a2a2a',
-                        color: secilenDep === dep ? '#fff' : '#a0a0a0',
-                      }}>{dep}</button>
+                      <FilterButon key={dep} dep={dep} aktif={secilenDep === dep} onClick={() => setSecilenDep(dep)} />
                     ))}
                   </div>
                 )}
               </div>
               <table style={styles.tabloEl}>
                 <thead>
-                  <tr>
-                    <th style={styles.th}>#</th>
+                  <tr style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderBottom: '1px solid #333' }}>
+                    <th style={{ ...styles.th, textAlign: 'center', width: '40px', paddingLeft: '8px', paddingRight: '8px' }}>#</th>
                     <th style={styles.th}>Ad Soyad</th>
                     <th style={styles.th}>Departman</th>
                     <th style={styles.th}>Rol</th>
-                    <th style={styles.th}>Ortalama Skor</th>
+                    <th style={{ ...styles.th, textAlign: 'right' }}>Ortalama Skor</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -190,12 +214,19 @@ function Dashboard() {
                       s.Rol === 'Employee' && (secilenDep === 'Tümü' ? true : s.Departman === secilenDep)
                     );
                     return filtreli.length > 0 ? filtreli.map((s, i) => (
-                      <tr key={i}>
-                        <td style={styles.td}>{i + 1}</td>
+                      <tr
+                        key={i}
+                        onMouseEnter={() => setHoveredRow(i)}
+                        onMouseLeave={() => setHoveredRow(null)}
+                        style={{ backgroundColor: hoveredRow === i ? 'rgba(255,255,255,0.04)' : 'transparent', transition: 'background-color 0.15s', cursor: 'default' }}
+                      >
+                        <td style={{ ...styles.td, textAlign: 'center', color: '#6b7280', fontWeight: '500', width: '40px', paddingLeft: '8px', paddingRight: '8px' }}>{i + 1}</td>
                         <td style={styles.td}>{s.Ad} {s.Soyad}</td>
                         <td style={styles.td}>{s.Departman}</td>
                         <td style={styles.td}>{s.Rol}</td>
-                        <td style={styles.td}>{s.OrtalamaToplamSkor ? s.OrtalamaToplamSkor.toFixed(2) : '-'}</td>
+                        <td style={{ ...styles.td, textAlign: 'right' }}>
+                          {s.OrtalamaToplamSkor ? s.OrtalamaToplamSkor.toFixed(2) : '-'}
+                        </td>
                       </tr>
                     )) : (
                       <tr><td colSpan="5" style={{ ...styles.td, textAlign: 'center' }}>Henüz değerlendirme verisi bulunmuyor.</td></tr>
@@ -211,6 +242,26 @@ function Dashboard() {
   );
 }
 
+function FilterButon({ dep, aktif, onClick }) {
+  const [hovered, setHovered] = React.useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: '6px 14px', borderRadius: '20px', border: 'none', cursor: 'pointer',
+        fontSize: '12px', fontWeight: '500',
+        transition: 'background-color 0.15s, color 0.15s',
+        backgroundColor: aktif ? '#4f46e5' : hovered ? '#383838' : '#2a2a2a',
+        color: aktif ? '#fff' : hovered ? '#e0e0e0' : '#a0a0a0',
+      }}
+    >
+      {dep}
+    </button>
+  );
+}
+
 const styles = {
   sayfa: { display: 'flex', backgroundColor: '#1c1c1c', minHeight: '100vh', color: '#fff' },
   icerik: { marginLeft: '220px', padding: '32px 40px', flex: 1 },
@@ -219,12 +270,13 @@ const styles = {
   kartGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' },
   kart: { backgroundColor: '#242424', borderRadius: '8px', padding: '20px', borderBottom: '3px solid #4f46e5', border: '1px solid #2a2a2a', borderBottomColor: '#4f46e5', borderBottomWidth: '3px' },
   kartEtiket: { fontSize: '12px', color: '#a0a0a0', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' },
+  kartIkon: { color: '#4f46e5', opacity: 0.8, flexShrink: 0 },
   kartDeger: { fontSize: '28px', fontWeight: '700', color: '#ffffff' },
   bolum: { backgroundColor: '#242424', borderRadius: '8px', padding: '24px', border: '1px solid #2a2a2a', marginBottom: '20px' },
   bolumBaslik: { fontSize: '15px', fontWeight: '600', color: '#fff', marginBottom: '20px' },
   tabloEl: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '10px 12px', fontSize: '11px', color: '#a0a0a0', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #333' },
-  td: { padding: '12px 12px', fontSize: '14px', color: '#e0e0e0', borderBottom: '1px solid #2a2a2a' },
+  th: { textAlign: 'left', padding: '12px 14px', fontSize: '11px', color: '#c4c4c4', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #333' },
+  td: { padding: '16px 14px', fontSize: '14px', color: '#e0e0e0', borderBottom: '1px solid #2a2a2a' },
 };
 
 export default Dashboard;
