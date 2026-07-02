@@ -167,6 +167,13 @@ const handleSubmit = async (e) => {
 
   return (
     <div style={styles.sayfa}>
+      <style>{`
+        .deg-textarea:focus {
+          outline: none;
+          border-color: #4f46e5 !important;
+          box-shadow: 0 0 0 1px #4f46e5;
+        }
+      `}</style>
       <Sidebar />
       <div style={styles.icerik}>
         <div style={styles.topBar}>
@@ -201,9 +208,9 @@ const handleSubmit = async (e) => {
                         style={{
                           flex: 1, padding: '7px 4px', borderRadius: '6px', fontSize: '12px',
                           fontWeight: aktif ? '600' : '400', cursor: 'pointer',
-                          border: aktif ? '1px solid #4f46e5' : '1px solid #333',
-                          backgroundColor: aktif ? '#2a2a3a' : '#242424',
-                          color: aktif ? '#818cf8' : '#666',
+                          border: aktif ? '1px solid #4f46e5' : '1px solid #374151',
+                          backgroundColor: aktif ? '#4f46e5' : '#1f2937',
+                          color: aktif ? '#ffffff' : '#9ca3af',
                         }}>{kisaAd[dep]}</button>
                     );
                   })}
@@ -374,15 +381,7 @@ const handleSubmit = async (e) => {
                       <div style={styles.puanButonlar}>
                         {[1, 2, 3, 4, 5].map(p => {
                           const etiketler = { 1: 'Yetersiz', 2: 'Gelişmeli', 3: 'Ortalama', 4: 'İyi', 5: 'Mükemmel' };
-                          const aktifRenkler = {
-                            1: { bg: '#7f1d1d', border: '#ef4444', color: '#fca5a5' },
-                            2: { bg: '#7c2d12', border: '#f97316', color: '#fdba74' },
-                            3: { bg: '#713f12', border: '#eab308', color: '#fde047' },
-                            4: { bg: '#14532d', border: '#22c55e', color: '#86efac' },
-                            5: { bg: '#1e1b4b', border: '#4f46e5', color: '#a5b4fc' },
-                          };
                           const secili = puanlar[ak.id] === p;
-                          const renk = aktifRenkler[p];
                           return (
                             <div key={p} style={{ position: 'relative' }}
                               onMouseEnter={e => e.currentTarget.querySelector('.tooltip').style.display = 'block'}
@@ -393,7 +392,7 @@ const handleSubmit = async (e) => {
                                 onClick={() => puanDegistir(ak.id, p)}
                                 style={{
                                   ...styles.puanButon,
-                                  ...(secili ? { backgroundColor: renk.bg, border: `1px solid ${renk.border}`, color: renk.color, fontWeight: '700' } : {})
+                                  ...(secili ? { backgroundColor: '#4f46e5', border: '1px solid #6366f1', color: '#ffffff', fontWeight: '700' } : {})
                                 }}
                               >
                                 {p}
@@ -421,6 +420,7 @@ const handleSubmit = async (e) => {
           <div style={styles.yorumAlani}>
             <label style={styles.label}>Genel Yorum</label>
             <textarea
+              className="deg-textarea"
               style={styles.textarea}
               rows={4}
               placeholder="Çalışanın güçlü yönleri ve gelişim alanlarına dair görüşleriniz..."
@@ -454,7 +454,7 @@ const styles = {
   altBaslik: { fontSize: '14px', color: '#a0a0a0', margin: 0 },
   basariKutusu: { backgroundColor: 'rgba(20,83,45,0.3)', border: '1px solid #166534', color: '#4ade80', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
   hataKutusu: { backgroundColor: 'rgba(69,10,10,0.3)', border: '1px solid #991b1b', color: '#f87171', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
-  bilgiKutusu: { backgroundColor: 'rgba(5,80,110,0.3)', border: '1px solid #0284c7', color: '#38bdf8', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
+  bilgiKutusu: { backgroundColor: 'rgba(30,58,138,0.2)', borderLeft: '4px solid #3b82f6', color: '#bfdbfe', padding: '16px', borderRadius: '0 6px 6px 0', marginBottom: '16px', fontSize: '13px' },
   ustForm: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
   label: { fontSize: '13px', color: '#b3b3b3', fontWeight: '500' },
@@ -467,7 +467,7 @@ const styles = {
   kriterSatir: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #2a2a2a' },
   kriterAdi: { fontSize: '14px', color: '#e0e0e0' },
   puanButonlar: { display: 'flex', gap: '8px' },
-  puanButon: { width: '36px', height: '36px', borderRadius: '6px', border: '1px solid #333', backgroundColor: '#141414', color: '#a0a0a0', fontSize: '14px', cursor: 'pointer', fontWeight: '500' },
+  puanButon: { width: '36px', height: '36px', borderRadius: '6px', border: '1px solid #374151', backgroundColor: '#1f2937', color: '#9ca3af', fontSize: '14px', cursor: 'pointer', fontWeight: '500', transition: 'all 0.15s' },
   puanButonAktif: { backgroundColor: '#4f46e5', color: '#fff', border: '1px solid #4f46e5' },
   yorumAlani: { marginTop: '40px', marginBottom: '24px', borderTop: '1px solid #2a2a2a', paddingTop: '24px' },
   textarea: { width: '100%', padding: '14px 16px', backgroundColor: '#242424', border: '1px solid #333', borderRadius: '8px', color: '#e0e0e0', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box', lineHeight: '1.6', marginTop: '8px' },

@@ -3,7 +3,7 @@ import Sidebar from '../components/Sidebar';
 import api from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-function CustomSelect({ value, onChange, gruplar, placeholder = 'Seçin...' }) {
+function CustomSelect({ value, onChange, gruplar, placeholder = 'Seçin...', hideClear = false }) {
   const [acik, setAcik] = useState(false);
   const ref = useRef(null);
 
@@ -38,26 +38,28 @@ function CustomSelect({ value, onChange, gruplar, placeholder = 'Seçin...' }) {
       </button>
 
       {acik && (
-        <div style={{
+        <div className="dropdown-scroll" style={{
           position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 200,
           backgroundColor: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px',
           boxShadow: '0 8px 24px rgba(0,0,0,0.5)', overflow: 'hidden', maxHeight: '260px', overflowY: 'auto',
         }}>
-          <div
-            onClick={() => { onChange(''); setAcik(false); }}
-            style={{
-              padding: '9px 14px', fontSize: '13px', cursor: 'pointer',
-              color: !value ? '#818cf8' : '#9ca3af',
-              backgroundColor: !value ? 'rgba(79,70,229,0.1)' : 'transparent',
-            }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = !value ? 'rgba(79,70,229,0.1)' : 'transparent'}
-          >
-            {placeholder}
-          </div>
+          {!hideClear && (
+            <div
+              onClick={() => { onChange(''); setAcik(false); }}
+              style={{
+                padding: '9px 14px', fontSize: '13px', cursor: 'pointer',
+                color: !value ? '#818cf8' : '#9ca3af',
+                backgroundColor: !value ? 'rgba(79,70,229,0.1)' : 'transparent',
+              }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = !value ? 'rgba(79,70,229,0.1)' : 'transparent'}
+            >
+              {placeholder}
+            </div>
+          )}
           {gruplar.map(g => (
             <div key={g.label}>
-              <div style={{ padding: '6px 14px 4px', fontSize: '10px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '600' }}>
+              <div style={{ padding: '10px 14px 4px', fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '700', borderTop: '1px solid #2a2a2a', marginTop: '2px' }}>
                 {g.label}
               </div>
               {g.secenekler.map(s => (
@@ -203,9 +205,12 @@ function Raporlar() {
     });
   };
 
+  const employeeIdleri = new Set(calisanlar.map(c => c.id || c.Id));
+  const sadeceCalisanSiralama = siralama.filter(s => employeeIdleri.has(s.Id));
+
   const grafikVerisi = rol === 'Employee'
     ? employeeGrafik
-    : siralama
+    : sadeceCalisanSiralama
         .filter(s => s.OrtalamaToplamSkor)
         .map(s => ({
           name: `${s.Ad} ${s.Soyad}`,
@@ -216,6 +221,11 @@ function Raporlar() {
     <div style={styles.sayfa}>
       <style>{`
         .rapor-select:focus { outline: none; border-color: #4f46e5 !important; box-shadow: 0 0 0 3px rgba(79,70,229,0.2); }
+        .dropdown-scroll::-webkit-scrollbar { width: 5px; }
+        .dropdown-scroll::-webkit-scrollbar-track { background: transparent; }
+        .dropdown-scroll::-webkit-scrollbar-thumb { background: #374151; border-radius: 99px; }
+        .dropdown-scroll::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+        .panel-select:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.25); }
       `}</style>
       <Sidebar />
       <div style={styles.icerik}>
@@ -283,6 +293,7 @@ function Raporlar() {
                 <Tooltip
                   contentStyle={{ backgroundColor: '#242424', border: '1px solid #333', borderRadius: '6px' }}
                   labelStyle={{ color: '#fff' }}
+                  itemStyle={{ color: '#e5e7eb' }}
                   formatter={(val) => [`${val}`, 'Skor']}
                   cursor={false}
                 />
@@ -343,20 +354,26 @@ function Raporlar() {
                 )}
               </>
             ) : (
-              <table style={styles.tabloEl}>
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', marginTop: '8px' }}>
                 <thead>
                   <tr>
                     <th style={styles.th}>#</th>
                     <th style={styles.th}>Ad Soyad</th>
-                    <th style={styles.th}>Departman</th>
+                    <th style={{ ...styles.th, textAlign: 'center' }}>Departman</th>
                     <th style={{ ...styles.th, textAlign: 'right' }}>Ortalama Skor</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {siralama.map((s, i) => (
+                  {sadeceCalisanSiralama.map((s, i) => (
                     <tr
                       key={i}
-                      style={{ ...styles.satir, backgroundColor: secilenCalisan === s.Id ? 'rgba(79,70,229,0.1)' : 'transparent' }}
+                      style={{
+                        borderBottom: '1px solid rgba(55,65,81,0.5)',
+                        transition: 'background-color 0.15s',
+                        borderLeft: secilenCalisan === s.Id ? '3px solid #4f46e5' : '3px solid transparent',
+                        backgroundColor: secilenCalisan === s.Id ? 'rgba(79,70,229,0.1)' : 'transparent',
+                        cursor: 'pointer',
+                      }}
                       onClick={() => {
                         if (secilenCalisan === s.Id) {
                           setSecilenCalisan('');
@@ -369,18 +386,16 @@ function Raporlar() {
                           calisanSkorGetir(s.Id);
                         }
                       }}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor = secilenCalisan === s.Id ? 'rgba(79,70,229,0.15)' : '#2a2a2a'}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = secilenCalisan === s.Id ? 'rgba(79,70,229,0.15)' : 'rgba(31,41,55,0.5)'}
                       onMouseLeave={e => e.currentTarget.style.backgroundColor = secilenCalisan === s.Id ? 'rgba(79,70,229,0.1)' : 'transparent'}
                     >
-                      <td style={{ ...styles.td, borderLeft: secilenCalisan === s.Id ? '3px solid #4f46e5' : '3px solid transparent' }}>
+                      <td style={styles.td}>
                         <span style={{ ...styles.siraNo, backgroundColor: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : '#2a2a2a' }}>
                           {i + 1}
                         </span>
                       </td>
-                      <td style={{ ...styles.td, fontWeight: i < 3 ? '600' : '400' }}>
-                        {s.Ad} {s.Soyad}
-                      </td>
-                      <td style={styles.td}>{s.Departman}</td>
+                      <td style={{ ...styles.td, fontWeight: i < 3 ? '600' : '400' }}>{s.Ad} {s.Soyad}</td>
+                      <td style={{ ...styles.td, textAlign: 'center' }}>{s.Departman}</td>
                       <td style={{ ...styles.td, textAlign: 'right' }}>
                         <span style={styles.skorText}>
                           {s.OrtalamaToplamSkor ? s.OrtalamaToplamSkor.toFixed(2) : '-'}
@@ -398,14 +413,22 @@ function Raporlar() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <div style={styles.kartBaslik} >Kategori Detayı</div>
                 {rol !== 'Employee' && calisanDonemleri.length > 1 && (
-                  <select
+                  <CustomSelect
+                    hideClear
                     value={panelDonem}
-                    onChange={e => donemeSkorGetir(secilenCalisan, e.target.value)}
-                    className="rapor-select"
-                    style={{ padding: '4px 8px', backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '6px', color: '#d1d5db', fontSize: '12px', cursor: 'pointer' }}
-                  >
-                    {calisanDonemleri.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
+                    onChange={(d) => donemeSkorGetir(secilenCalisan, d)}
+                    gruplar={Object.entries(
+                      calisanDonemleri.reduce((acc, d) => {
+                        const yil = d.split(' ')[0];
+                        if (!acc[yil]) acc[yil] = [];
+                        acc[yil].push(d);
+                        return acc;
+                      }, {})
+                    ).sort(([a], [b]) => b - a).map(([yil, yilDonemler]) => ({
+                      label: yil,
+                      secenekler: yilDonemler.map(d => ({ value: d, label: d }))
+                    }))}
+                  />
                 )}
               </div>
               {skorDetay ? (
@@ -438,7 +461,7 @@ function Raporlar() {
               {sonYorum && (
                 <div style={{ marginTop: '20px' }}>
                   <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '6px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Yorum</div>
-                  <div style={{ fontSize: '13px', color: '#d1d5db', lineHeight: '1.65', padding: '12px 14px', backgroundColor: '#1c1c1c', borderRadius: '6px', borderLeft: '2px solid #374151' }}>{sonYorum}</div>
+                  <div style={{ fontSize: '13px', color: '#d1d5db', lineHeight: '1.65', padding: '14px 16px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(55,65,81,0.5)', fontStyle: 'italic' }}>{sonYorum}</div>
                 </div>
               )}
               {!sonDonem && !sonTarih && !sonYorum && !skorDetay && (
@@ -463,21 +486,19 @@ const styles = {
   donemSelect: { padding: '9px 14px', backgroundColor: '#1e1e1e', color: '#f3f4f6', border: '1px solid #3a3a3a', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', transition: 'border-color 0.15s' },
   kart: { backgroundColor: '#242424', borderRadius: '8px', padding: '24px', border: '1px solid #2a2a2a', marginBottom: '16px' },
   kartBaslik: { fontSize: '15px', fontWeight: '600', color: '#fff', marginBottom: '0' },
-  tabloEl: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '10px 12px', fontSize: '11px', color: '#a0a0a0', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #333' },
-  td: { padding: '12px 12px', fontSize: '14px', color: '#e0e0e0', borderBottom: '1px solid #2a2a2a', cursor: 'pointer' },
-  satir: { transition: 'background 0.1s' },
+  th: { padding: '16px', fontSize: '14px', color: '#9ca3af', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left', borderBottom: '1px solid #374151' },
+  td: { padding: '16px', fontSize: '14px', color: '#e0e0e0', whiteSpace: 'nowrap' },
   siraNo: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', fontSize: '12px', fontWeight: '600', color: '#fff' },
   skorText: { fontWeight: '500', color: '#e0e0e0' },
   skorBuyuk: { fontSize: '48px', fontWeight: '700', color: '#4f46e5', textAlign: 'center', marginBottom: '4px', marginTop: '8px' },
   skorAlt: { fontSize: '13px', color: '#a0a0a0', textAlign: 'center', marginBottom: '28px' },
   kategoriListesi: { display: 'flex', flexDirection: 'column', gap: '16px' },
-  kategoriSatir: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' },
-  kategoriAdi: { fontSize: '13px', color: '#e0e0e0', minWidth: '120px' },
-  kategoriSag: { display: 'flex', alignItems: 'center', gap: '10px', flex: 1 },
+  kategoriSatir: { display: 'flex', alignItems: 'center', gap: '16px' },
+  kategoriAdi: { fontSize: '13px', color: '#e0e0e0', minWidth: '130px', lineHeight: '1', flexShrink: 0 },
+  kategoriSag: { display: 'flex', alignItems: 'center', gap: '12px', flex: 1 },
   barContainer: { flex: 1, height: '10px', backgroundColor: '#2a2a2a', borderRadius: '99px', overflow: 'hidden' },
   bar: { height: '100%', backgroundColor: '#4f46e5', borderRadius: '99px' },
-  kategoriPuan: { fontSize: '13px', color: '#a0a0a0', minWidth: '30px', textAlign: 'right' },
+  kategoriPuan: { fontSize: '13px', color: '#a0a0a0', minWidth: '30px', textAlign: 'right', lineHeight: '1', alignSelf: 'center' },
 };
 
 export default Raporlar;

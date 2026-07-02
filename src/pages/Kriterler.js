@@ -102,10 +102,29 @@ function Kriterler() {
   };
 
   const baslikAktifPasif = async (ab) => {
-    try { await api.put(`/AnaBasliklar/${ab.id}`, { ...ab, aktifMi: !ab.aktifMi }); verileriGetir(); } catch {}
+    try {
+      if (!ab.aktifMi) {
+        // Aktif yapılıyor: önce pasif olan alt kriterleri kaydet
+        const pasifOlanlar = altKriterler.filter(ak => ak.anaBaslikId === ab.id && !ak.aktifMi);
+        await api.put(`/AnaBasliklar/${ab.id}`, { ...ab, aktifMi: true });
+        // Backend cascade'i geri al — pasif olanları tekrar pasife çek
+        await Promise.all(pasifOlanlar.map(ak => api.put(`/AltKriterler/${ak.id}`, { ...ak, aktifMi: false })));
+      } else {
+        await api.put(`/AnaBasliklar/${ab.id}`, { ...ab, aktifMi: false });
+      }
+      verileriGetir();
+    } catch {}
   };
 
   const altKriterAktifPasif = async (ak) => {
+    if (!ak.aktifMi) {
+      const anaBaslik = anaBasliklar.find(ab => ab.id === ak.anaBaslikId);
+      if (anaBaslik && !anaBaslik.aktifMi) {
+        setHata(`Önce "${anaBaslik.baslik}" ana kriterini aktif yapın.`);
+        setTimeout(() => setHata(''), 3000);
+        return;
+      }
+    }
     try { await api.put(`/AltKriterler/${ak.id}`, { ...ak, aktifMi: !ak.aktifMi }); verileriGetir(); } catch {}
   };
 
@@ -137,6 +156,26 @@ function Kriterler() {
           border-color: #4f46e5 !important;
           box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
         }
+        .sil-buton:hover {
+          color: #ef4444 !important;
+          background-color: rgba(239, 68, 68, 0.12) !important;
+          border-color: rgba(239, 68, 68, 0.4) !important;
+        }
+        .duzenle-buton:hover {
+          color: #818cf8 !important;
+          background-color: rgba(99, 102, 241, 0.12) !important;
+          border-color: rgba(99, 102, 241, 0.4) !important;
+        }
+        .pasif-buton:hover {
+          color: #fbbf24 !important;
+          background-color: rgba(245, 158, 11, 0.12) !important;
+          border-color: rgba(245, 158, 11, 0.4) !important;
+        }
+        .aktif-buton:hover {
+          color: #86efac !important;
+          background-color: rgba(74, 222, 128, 0.18) !important;
+          border-color: rgba(74, 222, 128, 0.5) !important;
+        }
       `}</style>
       <Sidebar />
       <div style={styles.icerik}>
@@ -166,7 +205,7 @@ function Kriterler() {
 
         <div style={styles.grid}>
           {anaBasliklar.map(ab => (
-            <div key={ab.id} style={{ ...styles.kart, opacity: ab.aktifMi ? 1 : 0.65 }}>
+            <div key={ab.id} style={{ ...styles.kart, opacity: ab.aktifMi ? 1 : 0.75 }}>
               {/* Kart Başlık Satırı */}
               <div style={styles.kartUst}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -183,19 +222,22 @@ function Kriterler() {
                   <button
                     title="Düzenle"
                     onClick={() => { setDuzenlenecekBaslik({ ...ab }); setDuzenleModalAcik(true); }}
+                    className="duzenle-buton"
                     style={styles.ikonButon}
                   >
                     ✎
                   </button>
                   <button
                     onClick={() => baslikAktifPasif(ab)}
+                    className={ab.aktifMi ? 'pasif-buton' : 'aktif-buton'}
                     style={ab.aktifMi ? styles.pasifYapButon : styles.aktifYapButon}
                   >
-                    {ab.aktifMi ? 'Pasif' : 'Aktif'}
+                    {ab.aktifMi ? 'Pasif Yap' : 'Aktifleştir'}
                   </button>
                   <button
                     title="Sil"
                     onClick={() => baslikSil(ab.id)}
+                    className="sil-buton"
                     style={styles.silIkonButon}
                   >
                     ✕
@@ -233,6 +275,7 @@ function Kriterler() {
                       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                         <button
                           title="Düzenle"
+                          className="duzenle-buton"
                           onClick={async () => {
                             const map = await aciklamalariYukle(ak.id);
                             setDuzenlenecekAciklamalar(map);
@@ -245,13 +288,15 @@ function Kriterler() {
                         </button>
                         <button
                           onClick={() => altKriterAktifPasif(ak)}
+                          className={ak.aktifMi ? 'pasif-buton' : 'aktif-buton'}
                           style={ak.aktifMi ? styles.kucukPasifButon : styles.kucukAktifButon}
                         >
-                          {ak.aktifMi ? 'Pasif' : 'Aktif'}
+                          {ak.aktifMi ? 'Pasif Yap' : 'Aktifleştir'}
                         </button>
                         <button
                           title="Sil"
                           onClick={() => altKriterSil(ak.id)}
+                          className="sil-buton"
                           style={styles.kucukSilButon}
                         >
                           ✕
@@ -275,13 +320,13 @@ function Kriterler() {
                     width: '100%',
                     padding: '8px',
                     backgroundColor: 'transparent',
-                    border: `1px dashed ${hoveredEkleKart === ab.id ? '#4f46e5' : '#3f3f3f'}`,
+                    border: `1px dashed ${hoveredEkleKart === ab.id ? '#818cf8' : '#4b5563'}`,
                     borderRadius: '6px',
-                    color: hoveredEkleKart === ab.id ? '#818cf8' : '#6b7280',
+                    color: hoveredEkleKart === ab.id ? '#e5e7eb' : '#9ca3af',
                     fontSize: '12px',
                     fontWeight: '500',
                     cursor: 'pointer',
-                    opacity: hoveredEkleKart === ab.id ? 1 : 0.7,
+                    opacity: 1,
                     transition: 'all 0.15s ease',
                     letterSpacing: '0.3px',
                   }}
@@ -457,26 +502,29 @@ const styles = {
 
   ikonButon: {
     width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'transparent', color: '#6b7280', border: '1px solid #2d2d2d',
+    backgroundColor: 'transparent', color: '#9ca3af', border: '1px solid #3f3f46',
     borderRadius: '5px', fontSize: '13px', cursor: 'pointer',
+    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
   },
   pasifYapButon: {
     padding: '4px 10px', height: '28px',
     backgroundColor: 'transparent', color: '#9ca3af',
-    border: '1px solid #2d2d2d', borderRadius: '5px',
+    border: '1px solid #3f3f46', borderRadius: '5px',
     fontSize: '11px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap',
+    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
   },
   aktifYapButon: {
     padding: '4px 10px', height: '28px',
     backgroundColor: 'rgba(20,83,45,0.2)', color: '#4ade80',
     border: '1px solid rgba(22,101,52,0.35)', borderRadius: '5px',
     fontSize: '11px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap',
+    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
   },
   silIkonButon: {
     width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'transparent', color: '#6b7280', border: '1px solid #2d2d2d',
+    backgroundColor: 'transparent', color: 'rgba(239,68,68,0.6)', border: '1px solid rgba(239,68,68,0.2)',
     borderRadius: '5px', fontSize: '11px', cursor: 'pointer',
-    transition: 'color 0.15s, border-color 0.15s',
+    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
   },
 
   altKriterListesi: { borderTop: '1px solid #222', paddingTop: '14px' },
@@ -490,25 +538,29 @@ const styles = {
 
   kucukIkonButon: {
     width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'transparent', color: '#4b5563', border: '1px solid #262626',
+    backgroundColor: 'transparent', color: '#9ca3af', border: '1px solid #3f3f46',
     borderRadius: '4px', fontSize: '11px', cursor: 'pointer',
+    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
   },
   kucukPasifButon: {
     padding: '3px 8px', height: '24px',
-    backgroundColor: 'transparent', color: '#6b7280',
-    border: '1px solid #262626', borderRadius: '4px',
+    backgroundColor: 'transparent', color: '#9ca3af',
+    border: '1px solid #3f3f46', borderRadius: '4px',
     fontSize: '10px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap',
+    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
   },
   kucukAktifButon: {
     padding: '3px 8px', height: '24px',
     backgroundColor: 'rgba(20,83,45,0.2)', color: '#4ade80',
     border: '1px solid rgba(22,101,52,0.3)', borderRadius: '4px',
     fontSize: '10px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap',
+    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
   },
   kucukSilButon: {
     width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'transparent', color: '#6b7280', border: '1px solid #262626',
+    backgroundColor: 'transparent', color: 'rgba(239,68,68,0.6)', border: '1px solid rgba(239,68,68,0.2)',
     borderRadius: '4px', fontSize: '10px', cursor: 'pointer',
+    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
   },
 
   modalArkaplan: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },

@@ -92,6 +92,10 @@ function Gecmis() {
         .calisan-scroll::-webkit-scrollbar-track { background: transparent; }
         .calisan-scroll::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 99px; }
         .calisan-scroll::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
+        .gec-arama::placeholder { color: #6b7280; }
+        .gec-arama:focus { outline: none; border-color: #6366f1 !important; box-shadow: 0 0 0 2px rgba(99,102,241,0.3); }
+        .gec-chip:hover { background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important; }
+        .gec-liste-item:hover { background-color: #1f2937 !important; }
       `}</style>
       <Sidebar />
       <div style={styles.icerik}>
@@ -104,6 +108,7 @@ function Gecmis() {
           {/* Sol — çalışan listesi */}
           <div style={{ width: '260px', flexShrink: 0 }}>
             <input
+              className="gec-arama"
               style={styles.aramaInput}
               placeholder="Çalışan ara..."
               value={arama}
@@ -111,11 +116,17 @@ function Gecmis() {
             />
             <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
               {['Tümü', 'İş Analistleri', 'Yazılımcılar', 'QA/Test Uzmanları'].map(dep => (
-                <button key={dep} onClick={() => setSecilenDepFiltre(dep)} style={{
-                  padding: '4px 10px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: '500',
-                  backgroundColor: secilenDepFiltre === dep ? '#4f46e5' : '#2a2a2a',
-                  color: secilenDepFiltre === dep ? '#fff' : '#888',
-                }}>{dep === 'Tümü' ? 'Tümü' : dep === 'İş Analistleri' ? 'Analist' : dep === 'Yazılımcılar' ? 'Yazılımcı' : 'QA'}</button>
+                <button
+                  key={dep}
+                  className={secilenDepFiltre === dep ? '' : 'gec-chip'}
+                  onClick={() => setSecilenDepFiltre(dep)}
+                  style={{
+                    padding: '4px 10px', borderRadius: '12px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', transition: 'all 0.15s',
+                    backgroundColor: secilenDepFiltre === dep ? '#4f46e5' : '#1f2937',
+                    color: secilenDepFiltre === dep ? '#fff' : '#9ca3af',
+                    border: secilenDepFiltre === dep ? '1px solid #4f46e5' : '1px solid transparent',
+                  }}
+                >{dep === 'Tümü' ? 'Tümü' : dep === 'İş Analistleri' ? 'Analist' : dep === 'Yazılımcılar' ? 'Yazılımcı' : 'QA'}</button>
               ))}
             </div>
             <div className="calisan-scroll" style={styles.calisanListesi}>
@@ -125,8 +136,8 @@ function Gecmis() {
                 const id = c.id || c.Id;
                 const secili = secilenCalisan && (secilenCalisan.id || secilenCalisan.Id) === id;
                 return (
-                  <div key={i} onClick={() => calisanSec(c)} style={{
-                    padding: '12px 16px', cursor: 'pointer', borderRadius: '6px',
+                  <div key={i} onClick={() => calisanSec(c)} className={secili ? '' : 'gec-liste-item'} style={{
+                    padding: '12px 16px', cursor: 'pointer', borderRadius: '6px', transition: 'background-color 0.15s',
                     backgroundColor: secili ? '#2a2a3a' : 'transparent',
                     borderLeft: secili ? '3px solid #4f46e5' : '3px solid transparent',
                     marginBottom: '2px',
@@ -150,11 +161,11 @@ function Gecmis() {
           <div style={{ flex: 1 }}>
             {!secilenCalisan ? (
               <div style={styles.bosSecim}>
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#2d2d2d', marginBottom: '16px' }}>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#6b7280', marginBottom: '16px' }}>
                   <circle cx="12" cy="12" r="10"/>
                   <polyline points="12 6 12 12 16 14"/>
                 </svg>
-                <div style={{ color: '#4b5563', fontSize: '14px' }}>Geçmişini görüntülemek için sol listeden bir çalışan seçin</div>
+                <div style={{ color: '#9ca3af', fontSize: '18px', fontWeight: '500' }}>Geçmişini görüntülemek için sol listeden bir çalışan seçin</div>
               </div>
             ) : (
               <>
@@ -216,7 +227,7 @@ const styles = {
   icerik: { marginLeft: '220px', padding: '32px 40px', flex: 1 },
   baslik: { fontSize: '24px', fontWeight: '600', color: '#ffffff', margin: '0 0 6px' },
   altBaslik: { fontSize: '14px', color: '#a0a0a0', margin: 0 },
-  aramaInput: { width: '100%', padding: '10px 14px', backgroundColor: '#242424', border: '1px solid #333', borderRadius: '6px', color: '#fff', fontSize: '14px', marginBottom: '8px', boxSizing: 'border-box' },
+  aramaInput: { width: '100%', padding: '10px 14px', backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '6px', color: '#e5e7eb', fontSize: '14px', marginBottom: '8px', boxSizing: 'border-box', transition: 'border-color 0.15s, box-shadow 0.15s' },
   calisanListesi: { backgroundColor: '#242424', borderRadius: '8px', border: '1px solid #2a2a2a', padding: '8px', maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' },
   avatar: { width: '34px', height: '34px', borderRadius: '50%', backgroundColor: '#2a2a3a', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0 },
   avatarBuyuk: { width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#2a2a3a', color: '#818cf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '600', flexShrink: 0 },
@@ -227,7 +238,7 @@ const styles = {
   satir: { transition: 'background 0.1s' },
   donemBadge: { padding: '3px 8px', backgroundColor: 'rgba(255,255,255,0.06)', color: '#d1d5db', borderRadius: '5px', fontSize: '12px', fontWeight: '500' },
   bos: { padding: '32px', textAlign: 'center', color: '#555', fontSize: '14px' },
-  bosSecim: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', backgroundColor: '#242424', borderRadius: '8px', border: '1px solid #2a2a2a', color: '#888', fontSize: '14px' },
+  bosSecim: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', backgroundColor: 'rgba(17,24,39,0.5)', borderRadius: '16px', border: '2px dashed #374151', color: '#888', fontSize: '14px' },
 };
 
 export default Gecmis;

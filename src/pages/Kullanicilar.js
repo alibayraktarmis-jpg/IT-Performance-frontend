@@ -27,6 +27,20 @@ function IslemBtn({ onClick, children, variant = 'default' }) {
   );
 }
 
+function SelectWrap({ children }) {
+  return (
+    <div style={{ position: 'relative' }}>
+      {children}
+      <svg
+        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }}
+        width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+      >
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </div>
+  );
+}
+
 function Kullanicilar() {
   const [kullanicilar, setKullanicilar] = useState([]);
   const [modalAcik, setModalAcik] = useState(false);
@@ -57,7 +71,7 @@ function Kullanicilar() {
       setBasari('Kullanıcı başarıyla eklendi.');
       setHata('');
       setModalAcik(false);
-      setYeniKullanici({ ad: '', soyad: '', email: '', sifre: '', rol: 'Employee', departman: '' });
+      setYeniKullanici({ ad: '', soyad: '', email: '', sifre: '', rol: 'Employee', departman: '', evaluatorId: null });
       kullanicilariGetir();
     } catch {
       setHata('Kullanıcı eklenirken hata oluştu.');
@@ -104,6 +118,18 @@ function Kullanicilar() {
           outline: none;
           border-color: #4f46e5 !important;
           box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+        }
+        .modal-iptal:hover {
+          color: #fff !important;
+          background-color: rgba(55, 65, 81, 0.5) !important;
+        }
+        select.kul-input {
+          appearance: none;
+          -webkit-appearance: none;
+          padding-right: 32px;
+          width: 100%;
+          box-sizing: border-box;
+          display: block;
         }
       `}</style>
       <Sidebar />
@@ -221,39 +247,48 @@ function Kullanicilar() {
                   </div>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Rol</label>
-                    <select className="kul-input" style={styles.input} value={duzenlenecek.rol || 'Employee'}
-                      onChange={e => setDuzenlenecek({...duzenlenecek, rol: e.target.value})}>
-                      <option value="Employee">Employee</option>
-                      <option value="Evaluator">Evaluator</option>
-                      <option value="Admin">Admin</option>
-                    </select>
+                    <SelectWrap>
+                      <select className="kul-input" style={styles.input} value={duzenlenecek.rol || 'Employee'}
+                        onChange={e => setDuzenlenecek({...duzenlenecek, rol: e.target.value, evaluatorId: null})}>
+                        <option value="Employee">Employee</option>
+                        <option value="Evaluator">Evaluator</option>
+                        <option value="Admin">Admin</option>
+                      </select>
+                    </SelectWrap>
                   </div>
                   <div style={{ ...styles.inputGroup, gridColumn: '1 / -1' }}>
                     <label style={styles.label}>Departman</label>
-                    <select className="kul-input" style={styles.input} value={duzenlenecek.departman || ''}
-                      onChange={e => setDuzenlenecek({...duzenlenecek, departman: e.target.value})}>
-                      <option value="">Seçiniz</option>
-                      <option value="İş Analistleri">İş Analistleri</option>
-                      <option value="Yazılımcılar">Yazılımcılar</option>
-                      <option value="QA/Test Uzmanları">QA/Test Uzmanları</option>
-                      <option value="Yonetim">Yönetim</option>
-                    </select>
+                    <SelectWrap>
+                      <select className="kul-input" style={styles.input} value={duzenlenecek.departman || ''}
+                        onChange={e => setDuzenlenecek({...duzenlenecek, departman: e.target.value})}>
+                        <option value="">Seçiniz</option>
+                        <option value="İş Analistleri">İş Analistleri</option>
+                        <option value="Yazılımcılar">Yazılımcılar</option>
+                        <option value="QA/Test Uzmanları">QA/Test Uzmanları</option>
+                      </select>
+                    </SelectWrap>
                   </div>
                   {duzenlenecek.rol === 'Employee' && (
                     <div style={{ ...styles.inputGroup, gridColumn: '1 / -1' }}>
                       <label style={styles.label}>Değerlendirici</label>
-                      <select className="kul-input" style={styles.input} value={duzenlenecek.evaluatorId || ''}
-                        onChange={e => setDuzenlenecek({...duzenlenecek, evaluatorId: e.target.value ? parseInt(e.target.value) : null})}>
-                        <option value="">Seçiniz</option>
-                        {evaluatorlar.map(ev => (
-                          <option key={ev.id} value={ev.id}>{ev.ad} {ev.soyad} — {ev.departman}</option>
-                        ))}
-                      </select>
+                      <SelectWrap>
+                        <select className="kul-input" style={styles.input} value={duzenlenecek.evaluatorId || ''}
+                          onChange={e => {
+                            const evId = e.target.value ? parseInt(e.target.value) : null;
+                            const secilen = evaluatorlar.find(ev => ev.id === evId);
+                            setDuzenlenecek({...duzenlenecek, evaluatorId: evId, departman: secilen ? secilen.departman : duzenlenecek.departman});
+                          }}>
+                          <option value="">Seçiniz</option>
+                          {evaluatorlar.map(ev => (
+                            <option key={ev.id} value={ev.id}>{ev.ad} {ev.soyad} — {ev.departman}</option>
+                          ))}
+                        </select>
+                      </SelectWrap>
                     </div>
                   )}
                 </div>
                 <div style={styles.modalButonlar}>
-                  <button type="button" onClick={() => { setDuzenleModalAcik(false); setDuzenlenecek(null); }} style={styles.iptalButon}>İptal</button>
+                  <button type="button" className="modal-iptal" onClick={() => { setDuzenleModalAcik(false); setDuzenlenecek(null); }} style={styles.iptalButon}>İptal</button>
                   <button type="submit" style={styles.kaydetButon}>Güncelle</button>
                 </div>
               </form>
@@ -289,43 +324,52 @@ function Kullanicilar() {
                   </div>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Rol</label>
-                    <select className="kul-input" style={styles.input} value={yeniKullanici.rol}
-                      onChange={e => setYeniKullanici({...yeniKullanici, rol: e.target.value})}>
-                      <option value="Employee">Employee</option>
-                      <option value="Evaluator">Evaluator</option>
-                      <option value="Admin">Admin</option>
-                    </select>
+                    <SelectWrap>
+                      <select className="kul-input" style={styles.input} value={yeniKullanici.rol}
+                        onChange={e => setYeniKullanici({...yeniKullanici, rol: e.target.value, evaluatorId: null})}>
+                        <option value="Employee">Employee</option>
+                        <option value="Evaluator">Evaluator</option>
+                        <option value="Admin">Admin</option>
+                      </select>
+                    </SelectWrap>
                   </div>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Departman</label>
-                    <select className="kul-input" style={styles.input} value={yeniKullanici.departman}
-                      onChange={e => {
-                        const dep = e.target.value;
-                        const otomatikEv = evaluatorlar.find(ev => ev.departman === dep);
-                        setYeniKullanici({...yeniKullanici, departman: dep, evaluatorId: otomatikEv ? otomatikEv.id : null});
-                      }} required>
-                      <option value="">Seçiniz</option>
-                      <option value="İş Analistleri">İş Analistleri</option>
-                      <option value="Yazılımcılar">Yazılımcılar</option>
-                      <option value="QA/Test Uzmanları">QA/Test Uzmanları</option>
-                      <option value="Yonetim">Yönetim</option>
-                    </select>
+                    <SelectWrap>
+                      <select className="kul-input" style={styles.input} value={yeniKullanici.departman}
+                        onChange={e => {
+                          const dep = e.target.value;
+                          const otomatikEv = evaluatorlar.find(ev => ev.departman === dep);
+                          setYeniKullanici({...yeniKullanici, departman: dep, evaluatorId: otomatikEv ? otomatikEv.id : null});
+                        }} required>
+                        <option value="">Seçiniz</option>
+                        <option value="İş Analistleri">İş Analistleri</option>
+                        <option value="Yazılımcılar">Yazılımcılar</option>
+                        <option value="QA/Test Uzmanları">QA/Test Uzmanları</option>
+                      </select>
+                    </SelectWrap>
                   </div>
                   {yeniKullanici.rol === 'Employee' && (
                     <div style={{ ...styles.inputGroup, gridColumn: '1 / -1' }}>
                       <label style={styles.label}>Değerlendirici</label>
-                      <select className="kul-input" style={styles.input} value={yeniKullanici.evaluatorId || ''}
-                        onChange={e => setYeniKullanici({...yeniKullanici, evaluatorId: e.target.value ? parseInt(e.target.value) : null})}>
-                        <option value="">Seçiniz</option>
-                        {evaluatorlar.map(ev => (
-                          <option key={ev.id} value={ev.id}>{ev.ad} {ev.soyad} — {ev.departman}</option>
-                        ))}
-                      </select>
+                      <SelectWrap>
+                        <select className="kul-input" style={styles.input} value={yeniKullanici.evaluatorId || ''}
+                          onChange={e => {
+                            const evId = e.target.value ? parseInt(e.target.value) : null;
+                            const secilen = evaluatorlar.find(ev => ev.id === evId);
+                            setYeniKullanici({...yeniKullanici, evaluatorId: evId, departman: secilen ? secilen.departman : yeniKullanici.departman});
+                          }}>
+                          <option value="">Seçiniz</option>
+                          {evaluatorlar.map(ev => (
+                            <option key={ev.id} value={ev.id}>{ev.ad} {ev.soyad} — {ev.departman}</option>
+                          ))}
+                        </select>
+                      </SelectWrap>
                     </div>
                   )}
                 </div>
                 <div style={styles.modalButonlar}>
-                  <button type="button" onClick={() => setModalAcik(false)} style={styles.iptalButon}>İptal</button>
+                  <button type="button" className="modal-iptal" onClick={() => setModalAcik(false)} style={styles.iptalButon}>İptal</button>
                   <button type="submit" style={styles.kaydetButon}>Kaydet</button>
                 </div>
               </form>
@@ -361,11 +405,11 @@ const styles = {
   modalBaslik: { fontSize: '18px', fontWeight: '600', color: '#fff', margin: '0 0 24px' },
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  label: { fontSize: '13px', color: '#b3b3b3', fontWeight: '500' },
+  label: { fontSize: '13px', color: '#d1d5db', fontWeight: '500', display: 'block', marginBottom: '6px' },
   aramaInput: { width: '100%', padding: '9px 12px 9px 38px', backgroundColor: '#1e1e1e', border: '1px solid #3a3a3a', borderRadius: '6px', color: '#f3f4f6', fontSize: '13px', boxSizing: 'border-box', transition: 'border-color 0.15s' },
   input: { padding: '10px 12px', backgroundColor: '#1e1e1e', border: '1px solid #3a3a3a', borderRadius: '6px', color: '#f3f4f6', fontSize: '14px', transition: 'border-color 0.15s' },
   modalButonlar: { display: 'flex', justifyContent: 'flex-end', gap: '12px' },
-  iptalButon: { padding: '10px 20px', backgroundColor: 'transparent', color: '#a0a0a0', border: '1px solid #333', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' },
+  iptalButon: { padding: '10px 20px', backgroundColor: 'transparent', color: '#d1d5db', border: '1px solid #374151', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', transition: 'color 0.15s, background-color 0.15s' },
   kaydetButon: { padding: '10px 20px', backgroundColor: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
 };
 
