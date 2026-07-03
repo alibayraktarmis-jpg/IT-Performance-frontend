@@ -4,6 +4,31 @@ import api from '../services/api';
 
 const ROL_ACIKLAMALARI = ['Analist', 'Yazılımcı', 'QA'];
 
+const IconEdit = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
+const IconPower = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>
+  </svg>
+);
+const IconTrash = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6"/>
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+    <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+  </svg>
+);
+const IconAlertTriangle = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+  </svg>
+);
+
 function Kriterler() {
   const [anaBasliklar, setAnaBasliklar] = useState([]);
   const [altKriterler, setAltKriterler] = useState([]);
@@ -33,7 +58,7 @@ function Kriterler() {
     try {
       const res = await api.get(`/KriterAciklamalar/kriter/${altKriterId}`);
       const map = { Analist: '', Yazılımcı: '', QA: '' };
-      res.data.forEach(a => { if (map.hasOwnProperty(a.Rol || a.rol)) map[a.Rol || a.rol] = a.Aciklama || a.aciklama || ''; });
+      res.data.forEach(a => { if (map.hasOwnProperty(a.rol)) map[a.rol] = a.aciklama || ''; });
       return map;
     } catch { return { Analist: '', Yazılımcı: '', QA: '' }; }
   };
@@ -58,7 +83,7 @@ function Kriterler() {
     e.preventDefault();
     try {
       const res = await api.post('/AltKriterler', { ...yeniAltKriter, aktifMi: true });
-      const yeniId = res.data?.id || res.data?.Id;
+      const yeniId = res.data?.id;
       if (yeniId) await aciklamalariKaydet(yeniId, yeniAciklamalar);
       setBasari('Alt kriter eklendi.');
       setAltKriterModalAcik(false);
@@ -103,15 +128,9 @@ function Kriterler() {
 
   const baslikAktifPasif = async (ab) => {
     try {
-      if (!ab.aktifMi) {
-        // Aktif yapılıyor: önce pasif olan alt kriterleri kaydet
-        const pasifOlanlar = altKriterler.filter(ak => ak.anaBaslikId === ab.id && !ak.aktifMi);
-        await api.put(`/AnaBasliklar/${ab.id}`, { ...ab, aktifMi: true });
-        // Backend cascade'i geri al — pasif olanları tekrar pasife çek
-        await Promise.all(pasifOlanlar.map(ak => api.put(`/AltKriterler/${ak.id}`, { ...ak, aktifMi: false })));
-      } else {
-        await api.put(`/AnaBasliklar/${ab.id}`, { ...ab, aktifMi: false });
-      }
+      // Backend, ana baslik pasife alindiginda alt kriterleri otomatik pasife alir;
+      // aktiflestirmede ise alt kriterlerin durumuna dokunmaz.
+      await api.put(`/AnaBasliklar/${ab.id}`, { ...ab, aktifMi: !ab.aktifMi });
       verileriGetir();
     } catch {}
   };
@@ -159,22 +178,21 @@ function Kriterler() {
         .sil-buton:hover {
           color: #ef4444 !important;
           background-color: rgba(239, 68, 68, 0.12) !important;
-          border-color: rgba(239, 68, 68, 0.4) !important;
         }
         .duzenle-buton:hover {
-          color: #818cf8 !important;
-          background-color: rgba(99, 102, 241, 0.12) !important;
-          border-color: rgba(99, 102, 241, 0.4) !important;
+          color: #60a5fa !important;
+          background-color: rgba(59, 130, 246, 0.1) !important;
         }
         .pasif-buton:hover {
           color: #fbbf24 !important;
-          background-color: rgba(245, 158, 11, 0.12) !important;
-          border-color: rgba(245, 158, 11, 0.4) !important;
+          background-color: rgba(245, 158, 11, 0.1) !important;
         }
         .aktif-buton:hover {
-          color: #86efac !important;
-          background-color: rgba(74, 222, 128, 0.18) !important;
-          border-color: rgba(74, 222, 128, 0.5) !important;
+          color: #34d399 !important;
+          background-color: rgba(16, 185, 129, 0.1) !important;
+        }
+        .alt-kriter-satir:hover {
+          background-color: rgba(255, 255, 255, 0.05);
         }
       `}</style>
       <Sidebar />
@@ -201,7 +219,12 @@ function Kriterler() {
         </div>
 
         {basari && <div style={styles.basariKutusu}>{basari}</div>}
-        {hata && <div style={styles.hataKutusu}>{hata}</div>}
+        {hata && (
+          <div style={styles.hataKutusu}>
+            <span style={{ flexShrink: 0, display: 'flex' }}><IconAlertTriangle /></span>
+            <span>{hata}</span>
+          </div>
+        )}
 
         <div style={styles.grid}>
           {anaBasliklar.map(ab => (
@@ -225,22 +248,23 @@ function Kriterler() {
                     className="duzenle-buton"
                     style={styles.ikonButon}
                   >
-                    ✎
+                    <IconEdit />
                   </button>
                   <button
+                    title={ab.aktifMi ? 'Pasif Yap' : 'Aktifleştir'}
                     onClick={() => baslikAktifPasif(ab)}
                     className={ab.aktifMi ? 'pasif-buton' : 'aktif-buton'}
-                    style={ab.aktifMi ? styles.pasifYapButon : styles.aktifYapButon}
+                    style={styles.ikonButon}
                   >
-                    {ab.aktifMi ? 'Pasif Yap' : 'Aktifleştir'}
+                    <IconPower />
                   </button>
                   <button
                     title="Sil"
                     onClick={() => baslikSil(ab.id)}
                     className="sil-buton"
-                    style={styles.silIkonButon}
+                    style={styles.ikonButon}
                   >
-                    ✕
+                    <IconTrash />
                   </button>
                 </div>
               </div>
@@ -264,7 +288,7 @@ function Kriterler() {
                 {altKriterler.filter(ak => ak.anaBaslikId === ab.id).length === 0
                   ? <div style={styles.bosMetin}>Henüz alt kriter eklenmedi.</div>
                   : altKriterler.filter(ak => ak.anaBaslikId === ab.id).map(ak => (
-                    <div key={ak.id} style={styles.altKriterSatir}>
+                    <div key={ak.id} className="alt-kriter-satir" style={styles.altKriterSatir}>
                       <span style={{
                         ...styles.altKriterAdi,
                         color: ak.aktifMi ? '#d1d5db' : '#4b5563',
@@ -272,7 +296,7 @@ function Kriterler() {
                       }}>
                         {ak.kriterAdi}
                       </span>
-                      <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                         <button
                           title="Düzenle"
                           className="duzenle-buton"
@@ -284,22 +308,23 @@ function Kriterler() {
                           }}
                           style={styles.kucukIkonButon}
                         >
-                          ✎
+                          <IconEdit />
                         </button>
                         <button
+                          title={ak.aktifMi ? 'Pasif Yap' : 'Aktifleştir'}
                           onClick={() => altKriterAktifPasif(ak)}
                           className={ak.aktifMi ? 'pasif-buton' : 'aktif-buton'}
-                          style={ak.aktifMi ? styles.kucukPasifButon : styles.kucukAktifButon}
+                          style={styles.kucukIkonButon}
                         >
-                          {ak.aktifMi ? 'Pasif Yap' : 'Aktifleştir'}
+                          <IconPower />
                         </button>
                         <button
                           title="Sil"
                           onClick={() => altKriterSil(ak.id)}
                           className="sil-buton"
-                          style={styles.kucukSilButon}
+                          style={styles.kucukIkonButon}
                         >
-                          ✕
+                          <IconTrash />
                         </button>
                       </div>
                     </div>
@@ -319,15 +344,14 @@ function Kriterler() {
                     marginTop: '10px',
                     width: '100%',
                     padding: '8px',
-                    backgroundColor: 'transparent',
-                    border: `1px dashed ${hoveredEkleKart === ab.id ? '#818cf8' : '#4b5563'}`,
+                    backgroundColor: hoveredEkleKart === ab.id ? 'rgba(30,41,59,0.4)' : 'transparent',
+                    border: '1px dashed #334155',
                     borderRadius: '6px',
-                    color: hoveredEkleKart === ab.id ? '#e5e7eb' : '#9ca3af',
+                    color: hoveredEkleKart === ab.id ? '#cbd5e1' : '#94a3b8',
                     fontSize: '12px',
                     fontWeight: '500',
                     cursor: 'pointer',
-                    opacity: 1,
-                    transition: 'all 0.15s ease',
+                    transition: 'background-color 0.15s ease, color 0.15s ease',
                     letterSpacing: '0.3px',
                   }}
                 >
@@ -463,7 +487,7 @@ const styles = {
   altBaslik: { fontSize: '14px', color: '#6b7280', margin: 0 },
   ekleButon: { display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 18px', backgroundColor: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s ease' },
   basariKutusu: { backgroundColor: 'rgba(20,83,45,0.25)', border: '1px solid #166534', color: '#4ade80', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
-  hataKutusu: { backgroundColor: 'rgba(69,10,10,0.25)', border: '1px solid #7f1d1d', color: '#f87171', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
+  hataKutusu: { display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.2)', color: '#fb7185', padding: '12px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' },
 
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' },
 
@@ -481,50 +505,27 @@ const styles = {
 
   agirlikBadge: {
     fontSize: '11px', fontWeight: '600', padding: '2px 7px',
-    backgroundColor: 'rgba(79,70,229,0.18)', color: '#818cf8',
-    borderRadius: '12px', border: '1px solid rgba(79,70,229,0.3)',
-    whiteSpace: 'nowrap',
+    backgroundColor: 'rgba(99,102,241,0.1)', color: '#818cf8',
+    borderRadius: '12px', whiteSpace: 'nowrap',
   },
   aktifBadge: {
-    fontSize: '11px', fontWeight: '500', padding: '2px 7px',
-    backgroundColor: 'rgba(20,83,45,0.3)', color: '#4ade80',
-    borderRadius: '12px', border: '1px solid rgba(22,101,52,0.4)',
-    whiteSpace: 'nowrap',
+    fontSize: '11px', fontWeight: '600', padding: '2px 7px',
+    backgroundColor: 'rgba(16,185,129,0.1)', color: '#34d399',
+    borderRadius: '12px', whiteSpace: 'nowrap',
   },
   pasifBadge: {
-    fontSize: '11px', fontWeight: '500', padding: '2px 7px',
-    backgroundColor: 'rgba(69,10,10,0.3)', color: '#f87171',
-    borderRadius: '12px', border: '1px solid rgba(127,29,29,0.4)',
-    whiteSpace: 'nowrap',
+    fontSize: '11px', fontWeight: '600', padding: '2px 7px',
+    backgroundColor: 'rgba(244,63,94,0.1)', color: '#fb7185',
+    borderRadius: '12px', whiteSpace: 'nowrap',
   },
 
-  eylemGrup: { display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 },
+  eylemGrup: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 },
 
   ikonButon: {
-    width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'transparent', color: '#9ca3af', border: '1px solid #3f3f46',
-    borderRadius: '5px', fontSize: '13px', cursor: 'pointer',
-    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
-  },
-  pasifYapButon: {
-    padding: '4px 10px', height: '28px',
-    backgroundColor: 'transparent', color: '#9ca3af',
-    border: '1px solid #3f3f46', borderRadius: '5px',
-    fontSize: '11px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap',
-    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
-  },
-  aktifYapButon: {
-    padding: '4px 10px', height: '28px',
-    backgroundColor: 'rgba(20,83,45,0.2)', color: '#4ade80',
-    border: '1px solid rgba(22,101,52,0.35)', borderRadius: '5px',
-    fontSize: '11px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap',
-    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
-  },
-  silIkonButon: {
-    width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'transparent', color: 'rgba(239,68,68,0.6)', border: '1px solid rgba(239,68,68,0.2)',
-    borderRadius: '5px', fontSize: '11px', cursor: 'pointer',
-    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
+    padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'transparent', color: '#9ca3af', border: 'none',
+    borderRadius: '6px', cursor: 'pointer',
+    transition: 'color 0.15s, background-color 0.15s',
   },
 
   altKriterListesi: { borderTop: '1px solid #222', paddingTop: '14px' },
@@ -532,35 +533,17 @@ const styles = {
   bosMetin: { fontSize: '13px', color: '#374151', fontStyle: 'italic' },
   altKriterSatir: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '7px 0', borderBottom: '1px solid #1f1f1f',
+    padding: '7px 8px', margin: '0 -8px', borderRadius: '8px',
+    borderBottom: '1px solid rgba(255,255,255,0.04)',
+    transition: 'background-color 0.15s',
   },
   altKriterAdi: { fontSize: '13px', flex: 1, minWidth: 0 },
 
   kucukIkonButon: {
-    width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'transparent', color: '#9ca3af', border: '1px solid #3f3f46',
-    borderRadius: '4px', fontSize: '11px', cursor: 'pointer',
-    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
-  },
-  kucukPasifButon: {
-    padding: '3px 8px', height: '24px',
-    backgroundColor: 'transparent', color: '#9ca3af',
-    border: '1px solid #3f3f46', borderRadius: '4px',
-    fontSize: '10px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap',
-    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
-  },
-  kucukAktifButon: {
-    padding: '3px 8px', height: '24px',
-    backgroundColor: 'rgba(20,83,45,0.2)', color: '#4ade80',
-    border: '1px solid rgba(22,101,52,0.3)', borderRadius: '4px',
-    fontSize: '10px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap',
-    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
-  },
-  kucukSilButon: {
-    width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'transparent', color: 'rgba(239,68,68,0.6)', border: '1px solid rgba(239,68,68,0.2)',
-    borderRadius: '4px', fontSize: '10px', cursor: 'pointer',
-    transition: 'color 0.15s, border-color 0.15s, background-color 0.15s',
+    padding: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'transparent', color: '#9ca3af', border: 'none',
+    borderRadius: '6px', cursor: 'pointer',
+    transition: 'color 0.15s, background-color 0.15s',
   },
 
   modalArkaplan: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },

@@ -2,6 +2,20 @@ import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
 
+const IconInfo = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+  </svg>
+);
+
+const puanRenkleri = {
+  1: { hex: '#f87171', rgb: '248,113,113' },
+  2: { hex: '#fb923c', rgb: '251,146,60' },
+  3: { hex: '#818cf8', rgb: '129,140,248' },
+  4: { hex: '#4ade80', rgb: '74,222,128' },
+  5: { hex: '#10b981', rgb: '16,185,129' },
+};
+
 function Degerlendirme() {
   const mevcutRol = localStorage.getItem('rol');
   const mevcutDepartman = localStorage.getItem('departman');
@@ -27,15 +41,10 @@ function Degerlendirme() {
   const [guncellemeMode, setGuncellemeMode] = useState(false);
   const degerlendiriciId = localStorage.getItem('id');
 
-  const donemSecenekleri = [];
-  for (let y = 2024; y <= 2027; y++) {
-    ['Q1', 'Q2', 'Q3', 'Q4'].forEach(q => donemSecenekleri.push(`${y} ${q}`));
-  }
-
   useEffect(() => {
     if (mevcutRol !== 'Admin') setSecilenDep(mevcutDepartman || '');
     api.get('/Kullanicilar').then(res => {
-      setCalisanlar(res.data.filter(k => (k.rol || k.Rol) === 'Employee' && (k.aktifMi ?? k.AktifMi)));
+      setCalisanlar(res.data.filter(k => k.rol === 'Employee' && k.aktifMi));
     }).catch(() => {});
     api.get('/Degerlendirmeler').then(res => setTumDegerlendirmeler(res.data || [])).catch(() => {});
     api.get('/AnaBasliklar?sadaceAktif=true').then(res => {
@@ -53,13 +62,13 @@ function Degerlendirme() {
       }));
       setKriterAciklamalar(aciklamaMap);
     }).catch(() => {});
-  }, []);
+  }, [mevcutRol, mevcutDepartman]);
 
   // Çalışan değişince o çalışanın tüm dönemlerini çek
   useEffect(() => {
     if (!secilenCalisan) { setCalisanDonemler([]); return; }
     api.get(`/Degerlendirmeler/calisan/${secilenCalisan}`)
-      .then(res => setCalisanDonemler((res.data || []).map(d => d.Donem || d.donem)))
+      .then(res => setCalisanDonemler((res.data || []).map(d => d.donem)))
       .catch(() => setCalisanDonemler([]));
   }, [secilenCalisan]);
 
@@ -78,12 +87,12 @@ function Degerlendirme() {
     }).then(res => {
       if (res.data) {
         const { degerlendirme, detaylar } = res.data;
-        setMevcutDegerlendirmeId(degerlendirme.Id || degerlendirme.id);
+        setMevcutDegerlendirmeId(degerlendirme.id);
         setGuncellemeMode(true);
-        setYorum(degerlendirme.Yorum || degerlendirme.yorum || '');
+        setYorum(degerlendirme.yorum || '');
         const puanMap = {};
         detaylar.forEach(d => {
-          puanMap[d.AltKriterId || d.altKriterId] = d.Puan || d.puan;
+          puanMap[d.altKriterId] = d.puan;
         });
         setPuanlar(puanMap);
       } else {
@@ -116,6 +125,10 @@ function Degerlendirme() {
     });
     return Math.round(toplam * 100) / 100;
   };
+
+  const toplamKriterSayisi = altKriterler.length;
+  const doldurulanKriterSayisi = Object.values(puanlar).filter(p => p > 0).length;
+  const doluluk = toplamKriterSayisi > 0 ? Math.round((doldurulanKriterSayisi / toplamKriterSayisi) * 100) : 0;
 
 const handleSubmit = async (e) => {
     e.preventDefault();
@@ -188,34 +201,28 @@ const handleSubmit = async (e) => {
 
         {guncellemeMode && (
           <div style={styles.bilgiKutusu}>
-            Bu dönem için mevcut değerlendirme yüklendi. Değişikliklerinizi yapıp <strong>Güncelle</strong> butonuna basın.
+            <span style={{ color: '#60a5fa', flexShrink: 0, display: 'flex' }}><IconInfo /></span>
+            <span>Bu dönem için mevcut değerlendirme yüklendi. Değişikliklerinizi yapıp <strong>Güncelle</strong> butonuna basın.</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
           <div style={styles.ustForm}>
+            {mevcutRol === 'Admin' && (
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {['İş Analistleri', 'Yazılımcılar', 'QA/Test Uzmanları'].map(dep => {
+                  const kisaAd = { 'İş Analistleri': 'İş Analisti', 'Yazılımcılar': 'Yazılımcı', 'QA/Test Uzmanları': 'QA/Test' };
+                  const aktif = secilenDep === dep;
+                  return (
+                    <DepFiltreButon key={dep} label={kisaAd[dep]} aktif={aktif}
+                      onClick={() => { setSecilenDep(aktif ? '' : dep); setAramaMetni(''); }} />
+                  );
+                })}
+              </div>
+            )}
+            <div style={styles.secimSatiri}>
             <div style={styles.inputGroup}>
               <label style={styles.label}>Çalışan Seçin</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {/* Departman filtre butonları — sadece Admin'e göster */}
-                {mevcutRol === 'Admin' && <div style={{ display: 'flex', gap: '6px' }}>
-                  {['İş Analistleri', 'Yazılımcılar', 'QA/Test Uzmanları'].map(dep => {
-                    const kisaAd = { 'İş Analistleri': 'İş Analisti', 'Yazılımcılar': 'Yazılımcı', 'QA/Test Uzmanları': 'QA/Test' };
-                    const aktif = secilenDep === dep;
-                    return (
-                      <button key={dep} type="button"
-                        onClick={() => { setSecilenDep(aktif ? '' : dep); setAramaMetni(''); }}
-                        style={{
-                          flex: 1, padding: '7px 4px', borderRadius: '6px', fontSize: '12px',
-                          fontWeight: aktif ? '600' : '400', cursor: 'pointer',
-                          border: aktif ? '1px solid #4f46e5' : '1px solid #374151',
-                          backgroundColor: aktif ? '#4f46e5' : '#1f2937',
-                          color: aktif ? '#ffffff' : '#9ca3af',
-                        }}>{kisaAd[dep]}</button>
-                    );
-                  })}
-                </div>}
-                {/* Arama kutusu */}
                 <div style={{ position: 'relative' }}>
                   {secilenCalisan && (
                     <button type="button" onClick={() => { setSecilenCalisan(''); setAramaMetni(''); setSecilenCalisanRol(''); }}
@@ -238,8 +245,8 @@ const handleSubmit = async (e) => {
                     }}>
                       {(() => {
                         const filtrelenmis = calisanlar.filter(c => {
-                          const tam = `${c.ad || c.Ad} ${c.soyad || c.Soyad}`.toLowerCase();
-                          const depEsles = secilenDep ? (c.departman || c.Departman) === secilenDep : true;
+                          const tam = `${c.ad} ${c.soyad}`.toLowerCase();
+                          const depEsles = secilenDep ? c.departman === secilenDep : true;
                           return tam.includes(aramaMetni.toLowerCase()) && depEsles;
                         });
                         if (filtrelenmis.length === 0) return (
@@ -247,23 +254,23 @@ const handleSubmit = async (e) => {
                         );
                         const gruplar = secilenDep ? [secilenDep] : ['İş Analistleri', 'Yazılımcılar', 'QA/Test Uzmanları'];
                         return gruplar.map(dep => {
-                          const grup = filtrelenmis.filter(c => (c.departman || c.Departman) === dep);
+                          const grup = filtrelenmis.filter(c => c.departman === dep);
                           if (grup.length === 0) return null;
                           return (
                             <div key={dep}>
                               {!secilenDep && <div style={{ padding: '8px 14px 4px', fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '1px' }}>{dep}</div>}
                               {grup.map(c => {
-                                const id = c.id || c.Id;
-                                const isim = `${c.ad || c.Ad} ${c.soyad || c.Soyad}`;
+                                const id = c.id;
+                                const isim = `${c.ad} ${c.soyad}`;
                                 const secili = secilenCalisan === String(id);
                                 const buDonemYapildi = secilenDonem && tumDegerlendirmeler.some(
-                                  d => (d.CalisanId || d.calisanId) === id && (d.Donem || d.donem) === secilenDonem
+                                  d => d.calisanId === id && d.donem === secilenDonem
                                 );
                                 return (
                                   <div key={id}
                                     onMouseDown={() => {
                                       setSecilenCalisan(String(id));
-                                      setSecilenCalisanRol(c.departman || c.Departman || '');
+                                      setSecilenCalisanRol(c.departman || '');
                                       setAramaMetni(isim);
                                       setAramaAcik(false);
                                     }}
@@ -289,7 +296,6 @@ const handleSubmit = async (e) => {
                   )}
                 </div>
               </div>
-            </div>
             <div style={styles.inputGroup}>
               <label style={styles.label}>Dönem</label>
               <div style={{ position: 'relative' }}>
@@ -336,17 +342,30 @@ const handleSubmit = async (e) => {
                         return (
                           <button key={q} type="button"
                             onClick={() => { setSecilenDonem(donemStr); setDonemAcik(false); }}
+                            onMouseEnter={e => { if (secili) return; e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.boxShadow = '0 0 15px rgba(99,102,241,0.3)'; }}
+                            onMouseLeave={e => { if (secili) return; e.currentTarget.style.borderColor = yapildi ? '#059669' : '#2a2a2a'; e.currentTarget.style.boxShadow = 'none'; }}
                             style={{
+                              position: 'relative',
                               padding: '14px 8px', borderRadius: '8px', cursor: 'pointer',
                               border: secili ? '1px solid #4f46e5' : yapildi ? '1px solid #059669' : '1px solid #2a2a2a',
                               backgroundColor: secili ? '#4f46e5' : yapildi ? 'rgba(5,150,105,0.15)' : '#242424',
                               color: secili ? '#fff' : yapildi ? '#4ade80' : '#a0a0a0',
                               fontSize: '13px', fontWeight: '600', textAlign: 'center',
-                              transition: 'all 0.15s'
+                              transition: 'border-color 0.15s, box-shadow 0.15s, background-color 0.15s'
                             }}
                           >
+                            {yapildi && (
+                              <span style={{
+                                position: 'absolute', top: '4px', right: '4px',
+                                width: '16px', height: '16px', borderRadius: '50%',
+                                backgroundColor: secili ? 'rgba(255,255,255,0.25)' : 'rgba(5,150,105,0.25)',
+                                color: secili ? '#fff' : '#4ade80',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '10px', fontWeight: '700', lineHeight: 1,
+                              }}>✓</span>
+                            )}
                             <div style={{ fontSize: '16px', marginBottom: '3px' }}>{q}</div>
-                            <div style={{ fontSize: '11px', opacity: 0.8 }}>{yapildi && !secili ? '✓' : label}</div>
+                            <div style={{ fontSize: '11px', opacity: 0.8 }}>{label}</div>
                           </button>
                         );
                       })}
@@ -355,27 +374,28 @@ const handleSubmit = async (e) => {
                 )}
               </div>
             </div>
+            </div>
           </div>
 
           {anaBasliklar.map(ab => (
             <div key={ab.id} style={styles.kategoriKart}>
               <div style={styles.kategoriUst}>
                 <div style={styles.kategoriBaslik}>{ab.baslik}</div>
-                <div style={styles.kategoriAgirlik}>Ağırlık: %{ab.agirlikYuzdesi}</div>
+                <span style={styles.kategoriAgirlik}>Ağırlık: %{ab.agirlikYuzdesi}</span>
               </div>
               <div style={styles.kriterListesi}>
                 {altKriterler.filter(ak => ak.anaBaslikId === ab.id).map(ak => {
                   const aciklamaListesi = kriterAciklamalar[ak.id] || [];
                   const depToRol = { 'İş Analistleri': 'Analist', 'Yazılımcılar': 'Yazılımcı', 'QA/Test Uzmanları': 'QA' };
                   const rolAnahtar = depToRol[secilenCalisanRol] || secilenCalisanRol;
-                  const rolAciklama = aciklamaListesi.find(a => (a.Rol || a.rol) === rolAnahtar);
-                  const aciklamaMetni = rolAciklama ? (rolAciklama.Aciklama || rolAciklama.aciklama) : null;
+                  const rolAciklama = aciklamaListesi.find(a => a.rol === rolAnahtar);
+                  const aciklamaMetni = rolAciklama ? rolAciklama.aciklama : null;
                   return (
                     <div key={ak.id} style={styles.kriterSatir}>
                       <div>
                         <div style={styles.kriterAdi}>{ak.kriterAdi}</div>
                         {aciklamaMetni && (
-                          <div style={{ fontSize: '12px', color: '#a0a0a0', marginTop: '3px', fontStyle: 'italic' }}>{aciklamaMetni}</div>
+                          <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px' }}>{aciklamaMetni}</div>
                         )}
                       </div>
                       <div style={styles.puanButonlar}>
@@ -392,7 +412,11 @@ const handleSubmit = async (e) => {
                                 onClick={() => puanDegistir(ak.id, p)}
                                 style={{
                                   ...styles.puanButon,
-                                  ...(secili ? { backgroundColor: '#4f46e5', border: '1px solid #6366f1', color: '#ffffff', fontWeight: '700' } : {})
+                                  border: `1px solid rgba(${puanRenkleri[p].rgb}, ${secili ? '1' : '0.35'})`,
+                                  color: secili ? '#ffffff' : `rgba(${puanRenkleri[p].rgb}, 0.85)`,
+                                  backgroundColor: secili ? puanRenkleri[p].hex : '#1f2937',
+                                  fontWeight: secili ? '700' : '500',
+                                  boxShadow: secili ? `0 0 10px rgba(${puanRenkleri[p].rgb}, 0.55)` : 'none',
                                 }}
                               >
                                 {p}
@@ -430,8 +454,16 @@ const handleSubmit = async (e) => {
           </div>
 
           <div style={styles.altBar}>
-            <div style={styles.skorOnizleme}>
-              Tahmini Toplam Skor: <strong>{toplamSkorHesapla()}</strong>
+            <div>
+              <div style={styles.skorOnizleme}>
+                Tahmini Toplam Skor: <strong style={{ color: '#818cf8', fontSize: '20px' }}>{toplamSkorHesapla()}</strong>
+              </div>
+              <div style={{ fontSize: '12px', color: '#71717a', marginTop: '4px' }}>
+                {doluluk === 100 ? 'Tüm değişiklikler kaydedilmeye hazır' : `${doldurulanKriterSayisi}/${toplamKriterSayisi} kriter puanlandı`}
+              </div>
+              <div style={styles.dolulukBarTrack}>
+                <div style={{ ...styles.dolulukBarFill, width: `${doluluk}%` }} />
+              </div>
             </div>
             <button type="submit" style={{
               ...styles.kaydetButon,
@@ -446,33 +478,54 @@ const handleSubmit = async (e) => {
   );
 }
 
+function DepFiltreButon({ label, aktif, onClick }) {
+  const [hovered, setHovered] = React.useState(false);
+  return (
+    <button type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: '6px 14px', borderRadius: '20px', cursor: 'pointer',
+        fontSize: '12px', fontWeight: '500',
+        transition: 'background-color 0.15s, color 0.15s, border-color 0.15s',
+        backgroundColor: aktif ? '#4f46e5' : hovered ? '#3f3f4c' : '#303038',
+        border: aktif ? '1px solid #4f46e5' : hovered ? '1px solid #52525f' : '1px solid #40404a',
+        color: aktif ? '#fff' : hovered ? '#e5e7eb' : '#b4b4bd',
+      }}
+    >{label}</button>
+  );
+}
+
 const styles = {
   sayfa: { display: 'flex', backgroundColor: '#1c1c1c', minHeight: '100vh', color: '#fff' },
-  icerik: { marginLeft: '220px', padding: '32px 40px', flex: 1 },
+  icerik: { marginLeft: '220px', padding: '32px 40px 110px', flex: 1 },
   topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', borderBottom: '1px solid #2a2a2a', paddingBottom: '20px' },
   baslik: { fontSize: '24px', fontWeight: '600', color: '#ffffff', margin: '0 0 6px' },
   altBaslik: { fontSize: '14px', color: '#a0a0a0', margin: 0 },
   basariKutusu: { backgroundColor: 'rgba(20,83,45,0.3)', border: '1px solid #166534', color: '#4ade80', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
   hataKutusu: { backgroundColor: 'rgba(69,10,10,0.3)', border: '1px solid #991b1b', color: '#f87171', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
-  bilgiKutusu: { backgroundColor: 'rgba(30,58,138,0.2)', borderLeft: '4px solid #3b82f6', color: '#bfdbfe', padding: '16px', borderRadius: '0 6px 6px 0', marginBottom: '16px', fontSize: '13px' },
-  ustForm: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' },
+  bilgiKutusu: { display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'rgba(59,130,246,0.1)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '1px solid rgba(59,130,246,0.25)', color: '#bfdbfe', padding: '14px 16px', borderRadius: '12px', marginBottom: '16px', fontSize: '13px' },
+  ustForm: { display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' },
+  secimSatiri: { display: 'grid', gridTemplateColumns: '0.9fr 1fr', gap: '16px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
   label: { fontSize: '13px', color: '#b3b3b3', fontWeight: '500' },
   input: { padding: '10px 12px', backgroundColor: '#242424', border: '1px solid #333', borderRadius: '6px', color: '#fff', fontSize: '14px' },
   kategoriKart: { backgroundColor: '#242424', borderRadius: '8px', padding: '20px', marginBottom: '16px', border: '1px solid #2a2a2a' },
-  kategoriUst: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' },
+  kategoriUst: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' },
   kategoriBaslik: { fontSize: '16px', fontWeight: '600', color: '#fff' },
-  kategoriAgirlik: { fontSize: '13px', color: '#a0a0a0' },
+  kategoriAgirlik: { fontSize: '11px', padding: '4px 8px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.05)', color: '#cbd5e1', fontWeight: '500' },
   kriterListesi: { display: 'flex', flexDirection: 'column', gap: '12px' },
   kriterSatir: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #2a2a2a' },
   kriterAdi: { fontSize: '14px', color: '#e0e0e0' },
   puanButonlar: { display: 'flex', gap: '8px' },
-  puanButon: { width: '36px', height: '36px', borderRadius: '6px', border: '1px solid #374151', backgroundColor: '#1f2937', color: '#9ca3af', fontSize: '14px', cursor: 'pointer', fontWeight: '500', transition: 'all 0.15s' },
-  puanButonAktif: { backgroundColor: '#4f46e5', color: '#fff', border: '1px solid #4f46e5' },
+  puanButon: { width: '36px', height: '36px', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', transition: 'all 0.15s' },
   yorumAlani: { marginTop: '40px', marginBottom: '24px', borderTop: '1px solid #2a2a2a', paddingTop: '24px' },
   textarea: { width: '100%', padding: '14px 16px', backgroundColor: '#242424', border: '1px solid #333', borderRadius: '8px', color: '#e0e0e0', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box', lineHeight: '1.6', marginTop: '8px' },
-  altBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#242424', padding: '16px 20px', borderRadius: '8px', border: '1px solid #2a2a2a' },
+  altBar: { position: 'fixed', bottom: 0, left: '220px', right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(18,18,18,0.9)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.06)', padding: '16px 40px', zIndex: 50 },
   skorOnizleme: { fontSize: '16px', color: '#a0a0a0' },
+  dolulukBarTrack: { width: '220px', height: '4px', backgroundColor: '#27272a', borderRadius: '999px', overflow: 'hidden', marginTop: '8px' },
+  dolulukBarFill: { height: '100%', backgroundColor: '#4f46e5', borderRadius: '999px', transition: 'width 0.3s ease' },
   kaydetButon: { padding: '12px 28px', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' },
 };
 

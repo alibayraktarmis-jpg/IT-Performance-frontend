@@ -40,8 +40,9 @@ function CustomSelect({ value, onChange, gruplar, placeholder = 'Seçin...', hid
       {acik && (
         <div className="dropdown-scroll" style={{
           position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 200,
-          backgroundColor: '#1a1a1a', border: '1px solid #3a3a3a', borderRadius: '8px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.5)', overflow: 'hidden', maxHeight: '260px', overflowY: 'auto',
+          backgroundColor: '#1a1b23', border: '1px solid rgba(51,65,85,0.5)', borderRadius: '8px',
+          backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.5)', overflow: 'hidden', maxHeight: '260px', overflowY: 'auto',
         }}>
           {!hideClear && (
             <div
@@ -59,7 +60,7 @@ function CustomSelect({ value, onChange, gruplar, placeholder = 'Seçin...', hid
           )}
           {gruplar.map(g => (
             <div key={g.label}>
-              <div style={{ padding: '10px 14px 4px', fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '700', borderTop: '1px solid #2a2a2a', marginTop: '2px' }}>
+              <div style={{ padding: '10px 12px 4px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '600', borderTop: '1px solid rgba(51,65,85,0.3)', marginTop: '2px' }}>
                 {g.label}
               </div>
               {g.secenekler.map(s => (
@@ -112,14 +113,14 @@ function Raporlar() {
       api.get(`/Degerlendirmeler/skor/${id}`).then(res => setSkorDetay(res.data)).catch(() => {});
       api.get(`/Degerlendirmeler/calisan/${id}`).then(res => {
         const degerlendirmeler = res.data;
-        const tekDonemler = [...new Set(degerlendirmeler.map(d => d.Donem || d.donem).filter(Boolean))].sort().reverse();
+        const tekDonemler = [...new Set(degerlendirmeler.map(d => d.donem).filter(Boolean))].sort().reverse();
         setCalisanDonemleri(tekDonemler);
 
         // Dönem bazlı grafik verisi
         const donemGrup = {};
         degerlendirmeler.forEach(d => {
-          const donem = d.Donem || d.donem;
-          const skor = d.ToplamSkor ?? d.toplamSkor;
+          const donem = d.donem;
+          const skor = d.toplamSkor;
           if (donem && skor != null) {
             if (!donemGrup[donem]) donemGrup[donem] = [];
             donemGrup[donem].push(parseFloat(skor));
@@ -135,15 +136,15 @@ function Raporlar() {
 
         if (degerlendirmeler.length > 0) {
           const son = degerlendirmeler[degerlendirmeler.length - 1];
-          setSonYorum(son.Yorum || son.yorum || '');
-          setSonTarih((son.Tarih || son.tarih) ? new Date(son.Tarih || son.tarih).toLocaleDateString('tr-TR') : '');
-          setSonDonem(son.Donem || son.donem || '');
-          setPanelDonem(son.Donem || son.donem || '');
+          setSonYorum(son.yorum || '');
+          setSonTarih(son.tarih ? new Date(son.tarih).toLocaleDateString('tr-TR') : '');
+          setSonDonem(son.donem || '');
+          setPanelDonem(son.donem || '');
         }
         setSecilenCalisan(parseInt(id));
       }).catch(() => {});
     }
-  }, []);
+  }, [id, rol]);
 
   const donemDegistir = (donem) => {
     setSecilenDonem(donem);
@@ -169,11 +170,11 @@ function Raporlar() {
     api.get(`/Degerlendirmeler/skor/${calisanId}${donemParam}`).then(res => setSkorDetay(res.data)).catch(() => {});
     api.get(`/Degerlendirmeler/calisan/${calisanId}`).then(res => {
       const degerlendirmeler = res.data;
-      const filtreli = donem ? degerlendirmeler.filter(d => (d.Donem || d.donem) === donem) : degerlendirmeler;
+      const filtreli = donem ? degerlendirmeler.filter(d => d.donem === donem) : degerlendirmeler;
       const hedef = filtreli.length > 0 ? filtreli[filtreli.length - 1] : null;
-      setSonYorum(hedef ? (hedef.Yorum || hedef.yorum || '') : '');
-      setSonTarih(hedef && (hedef.Tarih || hedef.tarih) ? new Date(hedef.Tarih || hedef.tarih).toLocaleDateString('tr-TR') : '');
-      setSonDonem(hedef ? (hedef.Donem || hedef.donem || '') : '');
+      setSonYorum(hedef ? (hedef.yorum || '') : '');
+      setSonTarih(hedef && hedef.tarih ? new Date(hedef.tarih).toLocaleDateString('tr-TR') : '');
+      setSonDonem(hedef ? (hedef.donem || '') : '');
     }).catch(() => {});
   };
 
@@ -188,7 +189,7 @@ function Raporlar() {
 
     api.get(`/Degerlendirmeler/calisan/${calisanId}`).then(res => {
       const degerlendirmeler = res.data;
-      const tekDonemler = [...new Set(degerlendirmeler.map(d => d.Donem || d.donem).filter(Boolean))].sort().reverse();
+      const tekDonemler = [...new Set(degerlendirmeler.map(d => d.donem).filter(Boolean))].sort().reverse();
       setCalisanDonemleri(tekDonemler);
       const baslangicDonem = secilenDonem && tekDonemler.includes(secilenDonem) ? secilenDonem : (tekDonemler[0] || '');
       donemeSkorGetir(calisanId, baslangicDonem);
@@ -205,16 +206,16 @@ function Raporlar() {
     });
   };
 
-  const employeeIdleri = new Set(calisanlar.map(c => c.id || c.Id));
-  const sadeceCalisanSiralama = siralama.filter(s => employeeIdleri.has(s.Id));
+  const employeeIdleri = new Set(calisanlar.map(c => c.id));
+  const sadeceCalisanSiralama = siralama.filter(s => employeeIdleri.has(s.id));
 
   const grafikVerisi = rol === 'Employee'
     ? employeeGrafik
     : sadeceCalisanSiralama
-        .filter(s => s.OrtalamaToplamSkor)
+        .filter(s => s.ortalamaToplamSkor)
         .map(s => ({
-          name: `${s.Ad} ${s.Soyad}`,
-          skor: parseFloat(s.OrtalamaToplamSkor.toFixed(2))
+          name: `${s.ad} ${s.soyad}`,
+          skor: parseFloat(s.ortalamaToplamSkor.toFixed(2))
         }));
 
   return (
@@ -291,8 +292,13 @@ function Raporlar() {
                 <XAxis dataKey="name" tick={{ fill: '#a0a0a0', fontSize: 12 }} />
                 <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fill: '#a0a0a0', fontSize: 12 }} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#242424', border: '1px solid #333', borderRadius: '6px' }}
-                  labelStyle={{ color: '#fff' }}
+                  contentStyle={{
+                    backgroundColor: 'rgba(15,23,42,0.8)',
+                    backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.5)', padding: '8px 12px',
+                  }}
+                  labelStyle={{ color: '#fff', fontWeight: '600', marginBottom: '4px' }}
                   itemStyle={{ color: '#e5e7eb' }}
                   formatter={(val) => [`${val}`, 'Skor']}
                   cursor={false}
@@ -302,6 +308,7 @@ function Raporlar() {
                     <Cell
                       key={i}
                       fill={rol === 'Employee' ? '#4f46e5' : (i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : '#4f46e5')}
+                      fillOpacity={rol !== 'Employee' && i >= 3 ? 0.8 : 1}
                     />
                   ))}
                 </Bar>
@@ -370,12 +377,12 @@ function Raporlar() {
                       style={{
                         borderBottom: '1px solid rgba(55,65,81,0.5)',
                         transition: 'background-color 0.15s',
-                        borderLeft: secilenCalisan === s.Id ? '3px solid #4f46e5' : '3px solid transparent',
-                        backgroundColor: secilenCalisan === s.Id ? 'rgba(79,70,229,0.1)' : 'transparent',
+                        borderLeft: secilenCalisan === s.id ? '2px solid #6366f1' : '2px solid transparent',
+                        backgroundColor: secilenCalisan === s.id ? 'rgba(99,102,241,0.1)' : 'transparent',
                         cursor: 'pointer',
                       }}
                       onClick={() => {
-                        if (secilenCalisan === s.Id) {
+                        if (secilenCalisan === s.id) {
                           setSecilenCalisan('');
                           setSkorDetay(null);
                           setSonYorum('');
@@ -383,22 +390,30 @@ function Raporlar() {
                           setSonDonem('');
                           setCalisanDonemleri([]);
                         } else {
-                          calisanSkorGetir(s.Id);
+                          calisanSkorGetir(s.id);
                         }
                       }}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor = secilenCalisan === s.Id ? 'rgba(79,70,229,0.15)' : 'rgba(31,41,55,0.5)'}
-                      onMouseLeave={e => e.currentTarget.style.backgroundColor = secilenCalisan === s.Id ? 'rgba(79,70,229,0.1)' : 'transparent'}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = secilenCalisan === s.id ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.05)'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = secilenCalisan === s.id ? 'rgba(99,102,241,0.1)' : 'transparent'}
                     >
                       <td style={styles.td}>
-                        <span style={{ ...styles.siraNo, backgroundColor: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : '#2a2a2a' }}>
-                          {i + 1}
-                        </span>
+                        {i < 3 ? (
+                          <span style={{
+                            ...styles.siraNo,
+                            backgroundColor: i === 0 ? 'rgba(245,158,11,0.2)' : i === 1 ? 'rgba(148,163,184,0.2)' : 'rgba(180,83,9,0.2)',
+                            color: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : '#b45309',
+                          }}>
+                            {i + 1}
+                          </span>
+                        ) : (
+                          <span style={styles.siraNoDuz}>{i + 1}</span>
+                        )}
                       </td>
-                      <td style={{ ...styles.td, fontWeight: i < 3 ? '600' : '400' }}>{s.Ad} {s.Soyad}</td>
-                      <td style={{ ...styles.td, textAlign: 'center' }}>{s.Departman}</td>
+                      <td style={{ ...styles.td, fontWeight: i < 3 ? '600' : '400' }}>{s.ad} {s.soyad}</td>
+                      <td style={{ ...styles.td, textAlign: 'center' }}>{s.departman}</td>
                       <td style={{ ...styles.td, textAlign: 'right' }}>
                         <span style={styles.skorText}>
-                          {s.OrtalamaToplamSkor ? s.OrtalamaToplamSkor.toFixed(2) : '-'}
+                          {s.ortalamaToplamSkor ? s.ortalamaToplamSkor.toFixed(2) : '-'}
                         </span>
                       </td>
                     </tr>
@@ -433,18 +448,18 @@ function Raporlar() {
               </div>
               {skorDetay ? (
                 <>
-                  <div style={styles.skorBuyuk}>{typeof (skorDetay.ToplamSkor ?? skorDetay.toplamSkor) === 'number' ? (skorDetay.ToplamSkor ?? skorDetay.toplamSkor).toFixed(1) : (skorDetay.ToplamSkor ?? skorDetay.toplamSkor)}</div>
+                  <div style={styles.skorBuyuk}>{typeof skorDetay.toplamSkor === 'number' ? skorDetay.toplamSkor.toFixed(1) : skorDetay.toplamSkor}</div>
                   <div style={styles.skorAlt}>Toplam Skor</div>
                   <div style={styles.kategoriListesi}>
-                    {(skorDetay.KategoriDetay || skorDetay.kategoriDetay) && (skorDetay.KategoriDetay || skorDetay.kategoriDetay).map((k, i) => (
+                    {skorDetay.kategoriDetay && skorDetay.kategoriDetay.map((k, i) => (
                       <div key={i} style={styles.kategoriSatir}>
-                        <div style={styles.kategoriAdi}>{k.Baslik || k.baslik}</div>
+                        <div style={styles.kategoriAdi}>{k.baslik}</div>
                         <div style={styles.kategoriSag}>
                           <div style={styles.barContainer}>
-                            <div style={{ ...styles.bar, width: `${((k.OrtalmaPuan ?? k.ortalmaPuan) / 5) * 100}%` }} />
+                            <div style={{ ...styles.bar, width: `${(k.ortalamaPuan / 5) * 100}%` }} />
                           </div>
                           <span style={styles.kategoriPuan}>
-                            {(k.OrtalmaPuan ?? k.ortalmaPuan) ? (k.OrtalmaPuan ?? k.ortalmaPuan).toFixed(1) : '-'}
+                            {k.ortalamaPuan ? k.ortalamaPuan.toFixed(1) : '-'}
                           </span>
                         </div>
                       </div>
@@ -488,15 +503,16 @@ const styles = {
   kartBaslik: { fontSize: '15px', fontWeight: '600', color: '#fff', marginBottom: '0' },
   th: { padding: '16px', fontSize: '14px', color: '#9ca3af', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left', borderBottom: '1px solid #374151' },
   td: { padding: '16px', fontSize: '14px', color: '#e0e0e0', whiteSpace: 'nowrap' },
-  siraNo: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', fontSize: '12px', fontWeight: '600', color: '#fff' },
+  siraNo: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', fontSize: '12px', fontWeight: '700' },
+  siraNoDuz: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', fontSize: '12px', fontWeight: '600', color: '#64748b' },
   skorText: { fontWeight: '500', color: '#e0e0e0' },
-  skorBuyuk: { fontSize: '48px', fontWeight: '700', color: '#4f46e5', textAlign: 'center', marginBottom: '4px', marginTop: '8px' },
+  skorBuyuk: { fontSize: '48px', fontWeight: '700', color: '#818cf8', textAlign: 'center', marginBottom: '4px', marginTop: '8px' },
   skorAlt: { fontSize: '13px', color: '#a0a0a0', textAlign: 'center', marginBottom: '28px' },
   kategoriListesi: { display: 'flex', flexDirection: 'column', gap: '16px' },
   kategoriSatir: { display: 'flex', alignItems: 'center', gap: '16px' },
   kategoriAdi: { fontSize: '13px', color: '#e0e0e0', minWidth: '130px', lineHeight: '1', flexShrink: 0 },
   kategoriSag: { display: 'flex', alignItems: 'center', gap: '12px', flex: 1 },
-  barContainer: { flex: 1, height: '10px', backgroundColor: '#2a2a2a', borderRadius: '99px', overflow: 'hidden' },
+  barContainer: { flex: 1, height: '6px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '99px', overflow: 'hidden' },
   bar: { height: '100%', backgroundColor: '#4f46e5', borderRadius: '99px' },
   kategoriPuan: { fontSize: '13px', color: '#a0a0a0', minWidth: '30px', textAlign: 'right', lineHeight: '1', alignSelf: 'center' },
 };

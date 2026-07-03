@@ -2,9 +2,43 @@ import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
 
+const IconCheck = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+const IconEdit = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
+const IconTrash = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6"/>
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+    <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+  </svg>
+);
+const IconRotateCcw = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="1 4 1 10 7 10"/>
+    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+  </svg>
+);
+const IconClock = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+  </svg>
+);
+const IconCalendar = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+  </svg>
+);
+
 function Hedefler() {
   const rol = localStorage.getItem('rol');
-  const id = localStorage.getItem('id');
   const [hedefler, setHedefler] = useState([]);
   const [calisanlar, setCalisanlar] = useState([]);
   const [modalAcik, setModalAcik] = useState(false);
@@ -28,7 +62,7 @@ function Hedefler() {
         setCalisanlar(res.data.filter(k => k.rol === 'Employee' && k.aktifMi));
       }).catch(() => {});
     }
-  }, []);
+  }, [rol]);
 
   const hedefEkle = async () => {
     if (!secilenCalisan || !aciklama || !bitisTarihi) {
@@ -61,8 +95,8 @@ function Hedefler() {
 
   const duzenleAc = (h) => {
     setDuzenlenecekHedef(h);
-    setDuzenleAciklama(h.Aciklama ?? h.aciklama ?? '');
-    const bitis = new Date(h.BitisTarihi ?? h.bitisTarihi);
+    setDuzenleAciklama(h.aciklama ?? '');
+    const bitis = new Date(h.bitisTarihi);
     setDuzenleBitis(bitis.toISOString().split('T')[0]);
     setDuzenleModalAcik(true);
   };
@@ -70,7 +104,7 @@ function Hedefler() {
   const hedefGuncelle = async () => {
     if (!duzenleAciklama || !duzenleBitis) return;
     try {
-      await api.put(`/Hedefler/${duzenlenecekHedef.Id ?? duzenlenecekHedef.id}`, {
+      await api.put(`/Hedefler/${duzenlenecekHedef.id}`, {
         aciklama: duzenleAciklama,
         bitisTarihi: new Date(duzenleBitis).toISOString()
       });
@@ -88,13 +122,13 @@ function Hedefler() {
   };
 
   const bugun = new Date();
-  const aktifHedefler = hedefler.filter(h => !(h.TamamlandiMi ?? h.tamamlandiMi) && new Date(h.BitisTarihi ?? h.bitisTarihi) >= bugun);
-  const suresiGecmis = hedefler.filter(h => !(h.TamamlandiMi ?? h.tamamlandiMi) && new Date(h.BitisTarihi ?? h.bitisTarihi) < bugun);
-  const tamamlananlar = hedefler.filter(h => h.TamamlandiMi ?? h.tamamlandiMi);
+  const aktifHedefler = hedefler.filter(h => !h.tamamlandiMi && new Date(h.bitisTarihi) >= bugun);
+  const suresiGecmis = hedefler.filter(h => !h.tamamlandiMi && new Date(h.bitisTarihi) < bugun);
+  const tamamlananlar = hedefler.filter(h => h.tamamlandiMi);
 
   const HedefKart = ({ h }) => {
-    const tamamlandi = h.TamamlandiMi ?? h.tamamlandiMi;
-    const bitis = new Date(h.BitisTarihi ?? h.bitisTarihi);
+    const tamamlandi = h.tamamlandiMi;
+    const bitis = new Date(h.bitisTarihi);
     const gecti = !tamamlandi && bitis < bugun;
     const kalan = Math.ceil((bitis - bugun) / (1000 * 60 * 60 * 24));
     const [hovBtn, setHovBtn] = React.useState(null);
@@ -106,7 +140,7 @@ function Hedefler() {
         backgroundColor: '#1c1c1c',
         borderRadius: '8px',
         padding: '16px 20px',
-        border: '1px solid #2a2a2a',
+        border: gecti ? '1px solid rgba(244,63,94,0.2)' : '1px solid #2a2a2a',
         borderLeft: `4px solid ${solCizgi}`,
         display: 'flex',
         flexDirection: 'column',
@@ -119,7 +153,7 @@ function Hedefler() {
         <div>
           {(rol === 'Admin' || rol === 'Evaluator') && (
             <div style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '8px' }}>
-              {h.Ad ?? h.ad} {h.Soyad ?? h.soyad} · {h.Departman ?? h.departman}
+              {h.ad} {h.soyad} · {h.departman}
             </div>
           )}
           <div style={{
@@ -129,61 +163,71 @@ function Hedefler() {
             textDecoration: tamamlandi ? 'line-through' : 'none',
             lineHeight: '1.6'
           }}>
-            {h.Aciklama ?? h.aciklama}
+            {h.aciklama}
           </div>
         </div>
 
         {/* Alt: tarih bilgisi + butonlar aynı hizada */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: gecti ? '#f87171' : tamamlandi ? '#4ade80' : '#6b7280' }}>
+          <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: gecti ? '#fb7185' : tamamlandi ? '#34d399' : '#6b7280' }}>
+              <span style={{ color: '#94a3b8', display: 'flex' }}><IconClock /></span>
               {tamamlandi ? 'Tamamlandı' : gecti ? `${Math.abs(kalan)} gün geçti` : kalan === 0 ? 'Bugün bitiyor' : `${kalan} gün kaldı`}
             </span>
-            <span style={{ fontSize: '11px', color: '#4b5563' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#4b5563' }}>
+              <span style={{ color: '#94a3b8', display: 'flex' }}><IconCalendar /></span>
               Bitiş: {bitis.toLocaleDateString('tr-TR')}
             </span>
           </div>
-          <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-            <button
-              onClick={() => tamamla(h.Id ?? h.id, tamamlandi)}
-              onMouseEnter={() => setHovBtn('tamam')}
-              onMouseLeave={() => setHovBtn(null)}
-              style={{
-                padding: '6px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '500',
-                backgroundColor: hovBtn === 'tamam' ? (tamamlandi ? 'rgba(255,255,255,0.07)' : 'rgba(74,222,128,0.12)') : 'transparent',
-                color: tamamlandi ? '#6b7280' : '#4ade80',
-                transition: 'background-color 0.15s',
-              }}
-            >
-              {tamamlandi ? 'Geri Al' : 'Tamamlandı'}
-            </button>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            {(rol === 'Admin' || rol === 'Evaluator') && (
+              <button
+                title={tamamlandi ? 'Geri Al' : 'Tamamlandı'}
+                onClick={() => tamamla(h.id, tamamlandi)}
+                onMouseEnter={() => setHovBtn('tamam')}
+                onMouseLeave={() => setHovBtn(null)}
+                style={{
+                  padding: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: '6px', border: 'none', cursor: 'pointer',
+                  backgroundColor: hovBtn === 'tamam' ? (tamamlandi ? 'rgba(255,255,255,0.08)' : 'rgba(16,185,129,0.1)') : 'transparent',
+                  color: hovBtn === 'tamam' ? (tamamlandi ? '#d1d5db' : '#34d399') : '#9ca3af',
+                  transition: 'background-color 0.15s, color 0.15s',
+                }}
+              >
+                {tamamlandi ? <IconRotateCcw /> : <IconCheck />}
+              </button>
+            )}
             {(rol === 'Admin' || rol === 'Evaluator') && (
               <>
                 <button
+                  title="Düzenle"
                   onClick={() => duzenleAc(h)}
                   onMouseEnter={() => setHovBtn('duzenle')}
                   onMouseLeave={() => setHovBtn(null)}
                   style={{
-                    padding: '6px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '12px',
-                    backgroundColor: hovBtn === 'duzenle' ? 'rgba(79,70,229,0.15)' : 'transparent',
-                    color: hovBtn === 'duzenle' ? '#a5b4fc' : '#818cf8',
-                    transition: 'background-color 0.15s',
+                    padding: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    borderRadius: '6px', border: 'none', cursor: 'pointer',
+                    backgroundColor: hovBtn === 'duzenle' ? 'rgba(59,130,246,0.1)' : 'transparent',
+                    color: hovBtn === 'duzenle' ? '#60a5fa' : '#9ca3af',
+                    transition: 'background-color 0.15s, color 0.15s',
                   }}
                 >
-                  Düzenle
+                  <IconEdit />
                 </button>
                 <button
-                  onClick={() => sil(h.Id ?? h.id)}
+                  title="Sil"
+                  onClick={() => sil(h.id)}
                   onMouseEnter={() => setHovBtn('sil')}
                   onMouseLeave={() => setHovBtn(null)}
                   style={{
-                    padding: '6px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '12px',
+                    padding: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    borderRadius: '6px', border: 'none', cursor: 'pointer',
                     backgroundColor: hovBtn === 'sil' ? 'rgba(239,68,68,0.12)' : 'transparent',
-                    color: hovBtn === 'sil' ? '#ef4444' : 'rgba(248,113,113,0.7)',
-                    transition: 'background-color 0.15s',
+                    color: hovBtn === 'sil' ? '#ef4444' : '#9ca3af',
+                    transition: 'background-color 0.15s, color 0.15s',
                   }}
                 >
-                  Sil
+                  <IconTrash />
                 </button>
               </>
             )}
@@ -329,7 +373,7 @@ const styles = {
   hataKutu: { backgroundColor: 'rgba(69,10,10,0.3)', border: '1px solid #991b1b', color: '#f87171', padding: '10px', borderRadius: '6px', marginBottom: '14px', fontSize: '13px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' },
   label: { fontSize: '13px', color: '#b3b3b3', fontWeight: '500' },
-  input: { padding: '10px 12px', backgroundColor: '#141414', border: '1px solid #333', borderRadius: '6px', color: '#fff', fontSize: '14px' },
+  input: { padding: '10px 12px', backgroundColor: '#141414', border: '1px solid #333', borderRadius: '6px', color: '#fff', fontSize: '14px', colorScheme: 'dark' },
   kaydetButon: { flex: 1, padding: '10px', backgroundColor: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
   iptalButon: { flex: 1, padding: '10px', backgroundColor: '#2a2a2a', color: '#a0a0a0', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' },
 };

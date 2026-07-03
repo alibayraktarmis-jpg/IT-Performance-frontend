@@ -2,27 +2,52 @@ import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
 
-function IslemBtn({ onClick, children, variant = 'default' }) {
+const IconEdit = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
+const IconPower = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>
+  </svg>
+);
+const IconTrash = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6"/>
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+    <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+  </svg>
+);
+const IconPlus = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+
+function IslemBtn({ onClick, icon: Icon, variant = 'edit', title }) {
   const [hov, setHov] = React.useState(false);
   const renkler = {
-    default: { normal: '#9ca3af', bg: 'rgba(255,255,255,0.07)', hov: '#e5e7eb' },
-    primary: { normal: '#818cf8', bg: 'rgba(79,70,229,0.15)', hov: '#a5b4fc' },
-    danger:  { normal: 'rgba(248,113,113,0.75)', bg: 'rgba(239,68,68,0.12)', hov: '#ef4444' },
+    edit:   { hov: '#60a5fa', bg: 'rgba(59,130,246,0.1)' },
+    toggle: { hov: '#fbbf24', bg: 'rgba(245,158,11,0.1)' },
+    danger: { hov: '#fb7185', bg: 'rgba(244,63,94,0.1)' },
   }[variant];
   return (
     <button
       onClick={onClick}
+      title={title}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        padding: '5px 10px', border: 'none', borderRadius: '6px',
-        fontSize: '12px', cursor: 'pointer',
+        padding: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        border: 'none', borderRadius: '8px', cursor: 'pointer', flexShrink: 0,
         transition: 'background-color 0.15s, color 0.15s',
         backgroundColor: hov ? renkler.bg : 'transparent',
-        color: hov ? renkler.hov : renkler.normal,
+        color: hov ? renkler.hov : '#9ca3af',
       }}
     >
-      {children}
+      <Icon />
     </button>
   );
 }
@@ -116,8 +141,8 @@ function Kullanicilar() {
       <style>{`
         .kul-input:focus {
           outline: none;
-          border-color: #4f46e5 !important;
-          box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+          border-color: #6366f1 !important;
+          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.5);
         }
         .modal-iptal:hover {
           color: #fff !important;
@@ -130,6 +155,9 @@ function Kullanicilar() {
           width: 100%;
           box-sizing: border-box;
           display: block;
+        }
+        .kul-satir:hover {
+          background-color: rgba(255,255,255,0.05);
         }
       `}</style>
       <Sidebar />
@@ -162,7 +190,7 @@ function Kullanicilar() {
             />
           </div>
           <button onClick={() => setModalAcik(true)} style={styles.ekleButon}>
-            + Yeni Kullanıcı
+            <IconPlus /> Yeni Kullanıcı
           </button>
         </div>
 
@@ -183,7 +211,7 @@ function Kullanicilar() {
                 const q = aramaMetni.toLowerCase();
                 return !q || `${k.ad} ${k.soyad}`.toLowerCase().includes(q);
               }).map((k) => (
-                <tr key={k.id} style={styles.satir}>
+                <tr key={k.id} className="kul-satir" style={styles.satir}>
                   <td style={styles.td}>
                     <div style={styles.isimKismi}>
                       <div style={styles.avatar}>{k.ad?.[0]}{k.soyad?.[0]}</div>
@@ -203,19 +231,17 @@ function Kullanicilar() {
                   <td style={styles.td}>
                     <span style={{
                       ...styles.durumBadge,
-                      backgroundColor: k.aktifMi ? '#14532d' : '#450a0a',
-                      color: k.aktifMi ? '#4ade80' : '#f87171'
+                      backgroundColor: k.aktifMi ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)',
+                      color: k.aktifMi ? '#34d399' : '#fb7185'
                     }}>
                       {k.aktifMi ? 'Aktif' : 'Pasif'}
                     </span>
                   </td>
                   <td style={styles.td}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                      <IslemBtn variant="primary" onClick={() => { setDuzenlenecek({...k}); setDuzenleModalAcik(true); }}>Düzenle</IslemBtn>
-                      <span style={{ color: '#333', userSelect: 'none', fontSize: '13px' }}>|</span>
-                      <IslemBtn onClick={() => aktifPasifYap(k.id, k.aktifMi)}>{k.aktifMi ? 'Pasif Yap' : 'Aktif Yap'}</IslemBtn>
-                      <span style={{ color: '#333', userSelect: 'none', fontSize: '13px' }}>|</span>
-                      <IslemBtn variant="danger" onClick={() => kullaniciSil(k.id)}>Sil</IslemBtn>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <IslemBtn variant="edit" icon={IconEdit} title="Düzenle" onClick={() => { setDuzenlenecek({...k}); setDuzenleModalAcik(true); }} />
+                      <IslemBtn variant="toggle" icon={IconPower} title={k.aktifMi ? 'Pasif Yap' : 'Aktif Yap'} onClick={() => aktifPasifYap(k.id, k.aktifMi)} />
+                      <IslemBtn variant="danger" icon={IconTrash} title="Sil" onClick={() => kullaniciSil(k.id)} />
                     </div>
                   </td>
                 </tr>
@@ -387,20 +413,19 @@ const styles = {
   topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', borderBottom: '1px solid #2a2a2a', paddingBottom: '20px' },
   baslik: { fontSize: '24px', fontWeight: '600', color: '#ffffff', margin: '0 0 6px' },
   altBaslik: { fontSize: '14px', color: '#a0a0a0', margin: 0 },
-  ekleButon: { padding: '10px 20px', backgroundColor: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
+  ekleButon: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', backgroundColor: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
   basariKutusu: { backgroundColor: 'rgba(20,83,45,0.3)', border: '1px solid #166534', color: '#4ade80', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
   hataKutusu: { backgroundColor: 'rgba(69,10,10,0.3)', border: '1px solid #991b1b', color: '#f87171', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
   tablo: { backgroundColor: '#242424', borderRadius: '8px', padding: '24px' },
   tabloEl: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', padding: '12px 16px', fontSize: '12px', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #333', fontWeight: '600' },
   td: { padding: '14px 16px', fontSize: '14px', color: '#e0e0e0', borderBottom: '1px solid #2a2a2a' },
+  satir: { transition: 'background-color 0.15s' },
   isimKismi: { display: 'flex', alignItems: 'center', gap: '10px' },
   avatar: { width: '34px', height: '34px', borderRadius: '50%', backgroundColor: '#2a2a2a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0 },
   rolBadge: { padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', color: '#fff' },
-  durumBadge: { padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '500' },
-  islemButon: { padding: '6px 12px', backgroundColor: 'transparent', color: '#a0a0a0', border: '1px solid #333', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', marginRight: '8px' },
-  silButon: { padding: '6px 12px', backgroundColor: 'transparent', color: '#f87171', border: '1px solid #991b1b', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' },
-  modalArkaplan: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  durumBadge: { padding: '3px 10px', borderRadius: '9999px', fontSize: '12px', fontWeight: '600' },
+  modalArkaplan: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modal: { backgroundColor: '#242424', borderRadius: '12px', padding: '32px', width: '500px', border: '1px solid #333' },
   modalBaslik: { fontSize: '18px', fontWeight: '600', color: '#fff', margin: '0 0 24px' },
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' },
