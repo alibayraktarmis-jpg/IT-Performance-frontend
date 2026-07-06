@@ -1,24 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
-const IconUsers = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-  </svg>
-);
-const IconUserCheck = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/>
-    <polyline points="17 11 19 13 23 9"/>
-  </svg>
-);
-const IconBarChart = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
-    <line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>
-  </svg>
-);
+import { IconUsers, IconUserCheck, IconBarChart, IconActivity, IconTrophy, IconHash, IconCalendar, IconQuote } from '../components/icons';
+import FiltreButon from '../components/FiltreButon';
+import { DEPARTMANLAR } from '../constants/departmanlar';
 
 function Dashboard() {
   const rol = localStorage.getItem('rol');
@@ -91,20 +76,32 @@ function Dashboard() {
           <>
             <div style={styles.kartGrid}>
               <div className="dash-kart" style={styles.kart}>
-                <div style={styles.kartEtiket}>Genel Ortalama</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={styles.kartEtiket}>Genel Ortalama</div>
+                  <div style={{ ...styles.kartIkon, backgroundColor: 'rgba(16,185,129,0.1)', color: '#34d399' }}><IconActivity size={20} /></div>
+                </div>
                 <div style={styles.kartDeger}>{genelOrtalama ?? '-'}</div>
               </div>
               <div className="dash-kart" style={styles.kart}>
-                <div style={styles.kartEtiket}>En Yüksek Dönem</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={styles.kartEtiket}>En Yüksek Dönem</div>
+                  <div style={{ ...styles.kartIkon, backgroundColor: 'rgba(245,158,11,0.1)', color: '#fbbf24' }}><IconTrophy size={20} /></div>
+                </div>
                 <div style={styles.kartDeger}>{enYuksek ? enYuksek.name : '-'}</div>
                 {enYuksek && <div style={{ fontSize: '13px', color: '#4ade80', marginTop: '4px' }}>{enYuksek.skor} puan</div>}
               </div>
               <div className="dash-kart" style={styles.kart}>
-                <div style={styles.kartEtiket}>Değerlendirme Sayısı</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={styles.kartEtiket}>Değerlendirme Sayısı</div>
+                  <div style={{ ...styles.kartIkon, backgroundColor: 'rgba(99,102,241,0.1)', color: '#818cf8' }}><IconHash size={20} /></div>
+                </div>
                 <div style={styles.kartDeger}>{degerlendirmeler.length}</div>
               </div>
               <div className="dash-kart" style={styles.kart}>
-                <div style={styles.kartEtiket}>Son Değerlendirme</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={styles.kartEtiket}>Son Değerlendirme</div>
+                  <div style={{ ...styles.kartIkon, backgroundColor: 'rgba(59,130,246,0.1)', color: '#60a5fa' }}><IconCalendar size={20} /></div>
+                </div>
                 <div style={{ fontSize: '20px', fontWeight: '600', color: '#fff', marginTop: '4px' }}>
                   {sonDegerlendirme
                     ? new Date(sonDegerlendirme.tarih).toLocaleDateString('tr-TR')
@@ -131,8 +128,8 @@ function Dashboard() {
                           <span style={{ fontSize: '14px', color: '#e0e0e0' }}>{k.baslik}</span>
                           <span style={{ fontSize: '14px', fontWeight: '600', color: '#4f46e5' }}>{puan ? puan.toFixed(1) : '-'} / 5</span>
                         </div>
-                        <div style={{ height: '8px', backgroundColor: '#2a2a2a', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ width: `${yuzde}%`, height: '100%', backgroundColor: '#4f46e5', borderRadius: '4px' }} />
+                        <div style={{ height: '6px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '99px', overflow: 'hidden' }}>
+                          <div style={{ width: `${yuzde}%`, height: '100%', backgroundColor: '#4f46e5', borderRadius: '99px' }} />
                         </div>
                       </div>
                     );
@@ -144,8 +141,9 @@ function Dashboard() {
             {sonDegerlendirme && sonDegerlendirme.yorum && (
               <div style={styles.bolum}>
                 <div style={styles.bolumBaslik}>Son Yorum</div>
-                <div style={{ fontSize: '14px', color: '#e0e0e0', lineHeight: '1.7', padding: '16px', backgroundColor: '#1c1c1c', borderRadius: '8px', borderLeft: '3px solid #4f46e5' }}>
-                  "{sonDegerlendirme.yorum}"
+                <div style={{ position: 'relative', fontSize: '14px', color: '#cbd5e1', fontStyle: 'italic', lineHeight: '1.7', padding: '20px 44px 20px 24px', backgroundColor: '#1c1c1c', borderRadius: '8px', borderLeft: '2px solid #6366f1', overflow: 'hidden' }}>
+                  <span style={{ position: 'absolute', top: '10px', right: '14px', color: 'rgba(51,65,85,0.3)' }}><IconQuote size={32} /></span>
+                  <span style={{ position: 'relative', zIndex: 1 }}>{sonDegerlendirme.yorum}</span>
                 </div>
                 <div style={{ fontSize: '12px', color: '#a0a0a0', marginTop: '8px' }}>
                   {sonDegerlendirme.donem} · {new Date(sonDegerlendirme.tarih).toLocaleDateString('tr-TR')}
@@ -170,21 +168,21 @@ function Dashboard() {
                   <div className="dash-kart" style={styles.kart}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={styles.kartEtiket}>Toplam Çalışan</div>
-                      <div style={styles.kartIkon}><IconUsers /></div>
+                      <div style={{ ...styles.kartIkon, backgroundColor: 'rgba(59,130,246,0.1)', color: '#60a5fa' }}><IconUsers size={20} /></div>
                     </div>
                     <div style={styles.kartDeger}>{depFiltreli.length}</div>
                   </div>
                   <div className="dash-kart" style={styles.kart}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={styles.kartEtiket}>Değerlendirilen</div>
-                      <div style={styles.kartIkon}><IconUserCheck /></div>
+                      <div style={{ ...styles.kartIkon, backgroundColor: 'rgba(16,185,129,0.1)', color: '#34d399' }}><IconUserCheck /></div>
                     </div>
                     <div style={styles.kartDeger}>{degerlendirilen.length}</div>
                   </div>
                   <div className="dash-kart" style={styles.kart}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={styles.kartEtiket}>{secilenDep === 'Tümü' ? 'Genel Ortalama' : `${secilenDep} Ortalaması`}</div>
-                      <div style={styles.kartIkon}><IconBarChart /></div>
+                      <div style={{ ...styles.kartIkon, backgroundColor: 'rgba(245,158,11,0.1)', color: '#fbbf24' }}><IconBarChart /></div>
                     </div>
                     <div style={styles.kartDeger}>{ortalama}</div>
                   </div>
@@ -197,8 +195,8 @@ function Dashboard() {
                 <div style={styles.bolumBaslik}>Sıralama</div>
                 {rol === 'Admin' && (
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    {['Tümü', 'İş Analistleri', 'Yazılımcılar', 'QA/Test Uzmanları'].map(dep => (
-                      <FilterButon key={dep} dep={dep} aktif={secilenDep === dep} onClick={() => setSecilenDep(dep)} />
+                    {['Tümü', ...DEPARTMANLAR].map(dep => (
+                      <FiltreButon key={dep} label={dep} aktif={secilenDep === dep} onClick={() => setSecilenDep(dep)} />
                     ))}
                   </div>
                 )}
@@ -227,7 +225,19 @@ function Dashboard() {
                           onMouseLeave={() => setHoveredRow(null)}
                           style={{ cursor: 'default' }}
                         >
-                          <td style={{ ...styles.td, textAlign: 'center', color: '#6b7280', fontWeight: '500', width: '40px', paddingLeft: '8px', paddingRight: '8px', backgroundColor: tdBg, borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px', transition: 'background-color 0.15s' }}>{i + 1}</td>
+                          <td style={{ ...styles.td, textAlign: 'center', width: '40px', paddingLeft: '8px', paddingRight: '8px', backgroundColor: tdBg, borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px', transition: 'background-color 0.15s' }}>
+                            {i < 3 ? (
+                              <span style={{
+                                ...styles.siraNo,
+                                backgroundColor: i === 0 ? 'rgba(245,158,11,0.2)' : i === 1 ? 'rgba(148,163,184,0.2)' : 'rgba(180,83,9,0.2)',
+                                color: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : '#b45309',
+                              }}>
+                                {i + 1}
+                              </span>
+                            ) : (
+                              <span style={styles.siraNoDuz}>{i + 1}</span>
+                            )}
+                          </td>
                           <td style={{ ...styles.td, backgroundColor: tdBg, transition: 'background-color 0.15s' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               <div style={styles.avatarKucuk}>{s.ad?.[0]}{s.soyad?.[0]}</div>
@@ -235,7 +245,17 @@ function Dashboard() {
                             </div>
                           </td>
                           <td style={{ ...styles.td, backgroundColor: tdBg, transition: 'background-color 0.15s' }}>{s.departman}</td>
-                          <td style={{ ...styles.td, backgroundColor: tdBg, transition: 'background-color 0.15s' }}><span style={styles.rolBadge}>{s.rol}</span></td>
+                          <td style={{ ...styles.td, backgroundColor: tdBg, transition: 'background-color 0.15s' }}>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center',
+                              padding: '2px 10px', borderRadius: '6px',
+                              fontSize: '12px', fontWeight: '500',
+                              backgroundColor: 'rgba(99,102,241,0.1)', color: '#818cf8',
+                              border: '1px solid rgba(99,102,241,0.2)',
+                            }}>
+                              {s.rol}
+                            </span>
+                          </td>
                           <td style={{ ...styles.td, textAlign: 'right', backgroundColor: tdBg, borderTopRightRadius: '8px', borderBottomRightRadius: '8px', transition: 'background-color 0.15s' }}>
                             <span style={{ fontWeight: '600', color: skorRenk(s.ortalamaToplamSkor) }}>
                               {s.ortalamaToplamSkor ? s.ortalamaToplamSkor.toFixed(2) : '-'}
@@ -257,27 +277,6 @@ function Dashboard() {
   );
 }
 
-function FilterButon({ dep, aktif, onClick }) {
-  const [hovered, setHovered] = React.useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        padding: '6px 14px', borderRadius: '20px', cursor: 'pointer',
-        fontSize: '12px', fontWeight: '500',
-        transition: 'background-color 0.15s, color 0.15s, border-color 0.15s',
-        backgroundColor: aktif ? '#4f46e5' : hovered ? '#3f3f4c' : '#303038',
-        border: aktif ? '1px solid #4f46e5' : hovered ? '1px solid #52525f' : '1px solid #40404a',
-        color: aktif ? '#fff' : hovered ? '#e5e7eb' : '#b4b4bd',
-      }}
-    >
-      {dep}
-    </button>
-  );
-}
-
 const styles = {
   sayfa: { display: 'flex', backgroundColor: '#1c1c1c', minHeight: '100vh', color: '#fff' },
   icerik: { marginLeft: '220px', padding: '32px 40px', flex: 1 },
@@ -293,7 +292,8 @@ const styles = {
   tabloEl: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', padding: '12px 14px', fontSize: '11px', color: '#cbd5e1', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #333' },
   td: { padding: '20px 14px', fontSize: '14px', color: '#e0e0e0', borderBottom: '1px solid #2a2a2a' },
-  rolBadge: { display: 'inline-block', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '500', backgroundColor: 'rgba(59,130,246,0.1)', color: '#93c5fd' },
+  siraNo: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '50%', fontSize: '13px', fontWeight: '700' },
+  siraNoDuz: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', fontSize: '13px', fontWeight: '600', color: '#64748b' },
   avatarKucuk: { width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'rgba(99,102,241,0.2)', color: '#a5b4fc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600', flexShrink: 0 },
 };
 

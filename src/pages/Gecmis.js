@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
+import { DEPARTMANLAR } from '../constants/departmanlar';
 
 function Gecmis() {
   const rol = localStorage.getItem('rol');
   const kullaniciId = localStorage.getItem('id');
+  const kullaniciDepartman = localStorage.getItem('departman');
   const [calisanlar, setCalisanlar] = useState([]);
   const [secilenCalisan, setSecilenCalisan] = useState(null);
   const [degerlendirmeler, setDegerlendirmeler] = useState([]);
@@ -18,11 +20,11 @@ function Gecmis() {
       }).catch(() => {});
     } else {
       api.get('/Kullanicilar').then(res => {
-        const emplar = res.data.filter(k => k.rol === 'Employee');
+        const emplar = res.data.filter(k => k.rol === 'Employee' && (rol === 'Admin' || k.departman === kullaniciDepartman));
         setCalisanlar(emplar);
       }).catch(() => {});
     }
-  }, [rol, kullaniciId]);
+  }, [rol, kullaniciId, kullaniciDepartman]);
 
   const calisanSec = (calisan) => {
     setSecilenCalisan(calisan);
@@ -123,21 +125,23 @@ function Gecmis() {
                 onChange={e => setArama(e.target.value)}
               />
             </div>
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-              {['Tümü', 'İş Analistleri', 'Yazılımcılar', 'QA/Test Uzmanları'].map(dep => (
-                <button
-                  key={dep}
-                  className={secilenDepFiltre === dep ? '' : 'gec-chip'}
-                  onClick={() => setSecilenDepFiltre(dep)}
-                  style={{
-                    padding: '4px 10px', borderRadius: '12px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', transition: 'all 0.15s',
-                    backgroundColor: secilenDepFiltre === dep ? '#4f46e5' : '#242424',
-                    color: secilenDepFiltre === dep ? '#fff' : '#9ca3af',
-                    border: secilenDepFiltre === dep ? '1px solid #4f46e5' : '1px solid transparent',
-                  }}
-                >{dep === 'Tümü' ? 'Tümü' : dep === 'İş Analistleri' ? 'Analist' : dep === 'Yazılımcılar' ? 'Yazılımcı' : 'QA'}</button>
-              ))}
-            </div>
+            {rol === 'Admin' && (
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                {['Tümü', ...DEPARTMANLAR].map(dep => (
+                  <button
+                    key={dep}
+                    className={secilenDepFiltre === dep ? '' : 'gec-chip'}
+                    onClick={() => setSecilenDepFiltre(dep)}
+                    style={{
+                      padding: '4px 10px', borderRadius: '12px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', transition: 'all 0.15s',
+                      backgroundColor: secilenDepFiltre === dep ? '#4f46e5' : '#242424',
+                      color: secilenDepFiltre === dep ? '#fff' : '#9ca3af',
+                      border: secilenDepFiltre === dep ? '1px solid #4f46e5' : '1px solid transparent',
+                    }}
+                  >{dep === 'Tümü' ? 'Tümü' : dep === 'İş Analistleri' ? 'Analist' : dep === 'Yazılımcılar' ? 'Yazılımcı' : 'QA'}</button>
+                ))}
+              </div>
+            )}
             <div className="calisan-scroll" style={styles.calisanListesi}>
               {filtreliCalisanlar.length === 0 ? (
                 <div style={{ padding: '16px', color: '#555', fontSize: '13px' }}>Sonuç bulunamadı</div>
@@ -244,7 +248,7 @@ const styles = {
   th: { textAlign: 'left', padding: '12px 16px', fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #333', backgroundColor: 'rgba(255,255,255,0.03)' },
   td: { padding: '18px 16px', fontSize: '14px', color: '#e0e0e0', borderBottom: '1px solid #2a2a2a' },
   satir: { transition: 'background-color 0.15s' },
-  donemBadge: { padding: '3px 9px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#d1d5db', borderRadius: '6px', fontSize: '13px', fontWeight: '500' },
+  donemBadge: { display: 'inline-flex', alignItems: 'center', padding: '3px 10px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1', borderRadius: '6px', fontSize: '14px', fontWeight: '500' },
   bos: { padding: '32px', textAlign: 'center', color: '#555', fontSize: '14px' },
   bosSecim: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '2px dashed rgba(255,255,255,0.08)', color: '#888', fontSize: '14px' },
 };

@@ -1,30 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
-
-const IconEdit = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-  </svg>
-);
-const IconPower = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>
-  </svg>
-);
-const IconTrash = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6"/>
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-    <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-  </svg>
-);
-const IconPlus = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-  </svg>
-);
+import { IconEdit, IconPower, IconTrash, IconPlus } from '../components/icons';
+import { DEPARTMANLAR } from '../constants/departmanlar';
 
 function IslemBtn({ onClick, icon: Icon, variant = 'edit', title }) {
   const [hov, setHov] = React.useState(false);
@@ -47,7 +25,7 @@ function IslemBtn({ onClick, icon: Icon, variant = 'edit', title }) {
         color: hov ? renkler.hov : '#9ca3af',
       }}
     >
-      <Icon />
+      <Icon size={15} />
     </button>
   );
 }
@@ -109,8 +87,11 @@ function Kullanicilar() {
       await api.patch(`/Kullanicilar/${id}/aktif`, !aktifMi, {
         headers: { 'Content-Type': 'application/json' }
       });
+      setHata('');
       kullanicilariGetir();
-    } catch {}
+    } catch (err) {
+      setHata(err.response?.data?.mesaj || 'İşlem sırasında hata oluştu.');
+    }
   };
 
   const kullaniciGuncelle = async (e) => {
@@ -132,8 +113,11 @@ function Kullanicilar() {
     if (!window.confirm('Bu kullanıcıyı silmek istediğinize emin misiniz?')) return;
     try {
       await api.delete(`/Kullanicilar/${id}`);
+      setHata('');
       kullanicilariGetir();
-    } catch {}
+    } catch (err) {
+      setHata(err.response?.data?.mesaj || 'Kullanıcı silinirken hata oluştu.');
+    }
   };
 
   return (
@@ -288,9 +272,9 @@ function Kullanicilar() {
                       <select className="kul-input" style={styles.input} value={duzenlenecek.departman || ''}
                         onChange={e => setDuzenlenecek({...duzenlenecek, departman: e.target.value})}>
                         <option value="">Seçiniz</option>
-                        <option value="İş Analistleri">İş Analistleri</option>
-                        <option value="Yazılımcılar">Yazılımcılar</option>
-                        <option value="QA/Test Uzmanları">QA/Test Uzmanları</option>
+                        {DEPARTMANLAR.map(dep => (
+                          <option key={dep} value={dep}>{dep}</option>
+                        ))}
                       </select>
                     </SelectWrap>
                   </div>
@@ -369,9 +353,9 @@ function Kullanicilar() {
                           setYeniKullanici({...yeniKullanici, departman: dep, evaluatorId: otomatikEv ? otomatikEv.id : null});
                         }} required>
                         <option value="">Seçiniz</option>
-                        <option value="İş Analistleri">İş Analistleri</option>
-                        <option value="Yazılımcılar">Yazılımcılar</option>
-                        <option value="QA/Test Uzmanları">QA/Test Uzmanları</option>
+                        {DEPARTMANLAR.map(dep => (
+                          <option key={dep} value={dep}>{dep}</option>
+                        ))}
                       </select>
                     </SelectWrap>
                   </div>

@@ -1,33 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
+import { IconEdit, IconPower, IconTrash, IconAlertTriangle } from '../components/icons';
 
 const ROL_ACIKLAMALARI = ['Analist', 'Yazılımcı', 'QA'];
-
-const IconEdit = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-  </svg>
-);
-const IconPower = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>
-  </svg>
-);
-const IconTrash = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6"/>
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-    <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-  </svg>
-);
-const IconAlertTriangle = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-  </svg>
-);
 
 function Kriterler() {
   const [anaBasliklar, setAnaBasliklar] = useState([]);
@@ -73,10 +49,11 @@ function Kriterler() {
     try {
       await api.post('/AnaBasliklar', { ...yeniBaslik, aktifMi: true });
       setBasari('Ana başlık eklendi.');
+      setHata('');
       setModalAcik(false);
       setYeniBaslik({ baslik: '', agirlikYuzdesi: 0 });
       verileriGetir();
-    } catch { setHata('Hata oluştu.'); }
+    } catch (err) { setHata(err.response?.data?.mesaj || 'Hata oluştu.'); }
   };
 
   const altKriterEkle = async (e) => {
@@ -98,10 +75,11 @@ function Kriterler() {
     try {
       await api.put(`/AnaBasliklar/${duzenlenecekBaslik.id}`, duzenlenecekBaslik);
       setBasari('Ana başlık güncellendi.');
+      setHata('');
       setDuzenleModalAcik(false);
       setDuzenlenecekBaslik(null);
       verileriGetir();
-    } catch { setHata('Hata oluştu.'); }
+    } catch (err) { setHata(err.response?.data?.mesaj || 'Hata oluştu.'); }
   };
 
   const altKriterDuzenle = async (e) => {
@@ -118,12 +96,24 @@ function Kriterler() {
 
   const baslikSil = async (id) => {
     if (!window.confirm('Bu ana başlığı silmek istediğinize emin misiniz?')) return;
-    try { await api.delete(`/AnaBasliklar/${id}`); verileriGetir(); } catch {}
+    try {
+      await api.delete(`/AnaBasliklar/${id}`);
+      setHata('');
+      verileriGetir();
+    } catch (err) {
+      setHata(err.response?.data?.mesaj || 'Ana başlık silinirken hata oluştu.');
+    }
   };
 
   const altKriterSil = async (id) => {
     if (!window.confirm('Bu alt kriteri silmek istediğinize emin misiniz?')) return;
-    try { await api.delete(`/AltKriterler/${id}`); verileriGetir(); } catch {}
+    try {
+      await api.delete(`/AltKriterler/${id}`);
+      setHata('');
+      verileriGetir();
+    } catch (err) {
+      setHata(err.response?.data?.mesaj || 'Alt kriter silinirken hata oluştu.');
+    }
   };
 
   const baslikAktifPasif = async (ab) => {
@@ -131,8 +121,12 @@ function Kriterler() {
       // Backend, ana baslik pasife alindiginda alt kriterleri otomatik pasife alir;
       // aktiflestirmede ise alt kriterlerin durumuna dokunmaz.
       await api.put(`/AnaBasliklar/${ab.id}`, { ...ab, aktifMi: !ab.aktifMi });
+      setHata('');
       verileriGetir();
-    } catch {}
+    } catch (err) {
+      setHata(err.response?.data?.mesaj || 'İşlem sırasında hata oluştu.');
+      setTimeout(() => setHata(''), 4000);
+    }
   };
 
   const altKriterAktifPasif = async (ak) => {
@@ -144,7 +138,14 @@ function Kriterler() {
         return;
       }
     }
-    try { await api.put(`/AltKriterler/${ak.id}`, { ...ak, aktifMi: !ak.aktifMi }); verileriGetir(); } catch {}
+    try {
+      await api.put(`/AltKriterler/${ak.id}`, { ...ak, aktifMi: !ak.aktifMi });
+      setHata('');
+      verileriGetir();
+    } catch (err) {
+      setHata(err.response?.data?.mesaj || 'İşlem sırasında hata oluştu.');
+      setTimeout(() => setHata(''), 4000);
+    }
   };
 
   const AciklamaAlanlari = ({ aciklamalar, onChange }) => (
@@ -364,9 +365,15 @@ function Kriterler() {
 
         {/* Ana Başlık Ekle Modal */}
         {modalAcik && (
-          <div style={styles.modalArkaplan} onClick={() => setModalAcik(false)}>
+          <div style={styles.modalArkaplan} onClick={() => { setModalAcik(false); setHata(''); }}>
             <div style={styles.modal} onClick={e => e.stopPropagation()}>
               <h3 style={{ ...styles.modalBaslik, padding: 0, marginBottom: '24px' }}>Yeni Ana Başlık</h3>
+              {hata && (
+                <div style={{ ...styles.hataKutusu, marginBottom: '16px' }}>
+                  <span style={{ flexShrink: 0, display: 'flex' }}><IconAlertTriangle /></span>
+                  <span>{hata}</span>
+                </div>
+              )}
               <form onSubmit={anaBaslikEkle}>
                 <div style={styles.inputGroup}>
                   <label style={styles.label}>Başlık Adı</label>
@@ -380,7 +387,7 @@ function Kriterler() {
                     onChange={e => setYeniBaslik({ ...yeniBaslik, agirlikYuzdesi: parseInt(e.target.value) })} required />
                 </div>
                 <div style={styles.modalButonlar}>
-                  <button type="button" onClick={() => setModalAcik(false)} style={styles.iptalButon}>İptal</button>
+                  <button type="button" onClick={() => { setModalAcik(false); setHata(''); }} style={styles.iptalButon}>İptal</button>
                   <button type="submit" style={styles.kaydetButon}>Kaydet</button>
                 </div>
               </form>
@@ -390,9 +397,15 @@ function Kriterler() {
 
         {/* Ana Başlık Düzenle Modal */}
         {duzenleModalAcik && duzenlenecekBaslik && (
-          <div style={styles.modalArkaplan} onClick={() => { setDuzenleModalAcik(false); setDuzenlenecekBaslik(null); }}>
+          <div style={styles.modalArkaplan} onClick={() => { setDuzenleModalAcik(false); setDuzenlenecekBaslik(null); setHata(''); }}>
             <div style={styles.modal} onClick={e => e.stopPropagation()}>
               <h3 style={{ ...styles.modalBaslik, padding: 0, marginBottom: '24px' }}>Ana Başlık Düzenle</h3>
+              {hata && (
+                <div style={{ ...styles.hataKutusu, marginBottom: '16px' }}>
+                  <span style={{ flexShrink: 0, display: 'flex' }}><IconAlertTriangle /></span>
+                  <span>{hata}</span>
+                </div>
+              )}
               <form onSubmit={anaBaslikDuzenle}>
                 <div style={styles.inputGroup}>
                   <label style={styles.label}>Başlık Adı</label>
@@ -406,7 +419,7 @@ function Kriterler() {
                     onChange={e => setDuzenlenecekBaslik({ ...duzenlenecekBaslik, agirlikYuzdesi: parseInt(e.target.value) })} required />
                 </div>
                 <div style={styles.modalButonlar}>
-                  <button type="button" onClick={() => { setDuzenleModalAcik(false); setDuzenlenecekBaslik(null); }} style={styles.iptalButon}>İptal</button>
+                  <button type="button" onClick={() => { setDuzenleModalAcik(false); setDuzenlenecekBaslik(null); setHata(''); }} style={styles.iptalButon}>İptal</button>
                   <button type="submit" style={styles.kaydetButon}>Kaydet</button>
                 </div>
               </form>

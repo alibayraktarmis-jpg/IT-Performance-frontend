@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
-
-const IconInfo = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-  </svg>
-);
+import { IconInfo } from '../components/icons';
+import FiltreButon from '../components/FiltreButon';
+import { DEPARTMANLAR } from '../constants/departmanlar';
 
 const puanRenkleri = {
   1: { hex: '#f87171', rgb: '248,113,113' },
@@ -210,11 +207,11 @@ const handleSubmit = async (e) => {
           <div style={styles.ustForm}>
             {mevcutRol === 'Admin' && (
               <div style={{ display: 'flex', gap: '6px' }}>
-                {['İş Analistleri', 'Yazılımcılar', 'QA/Test Uzmanları'].map(dep => {
+                {DEPARTMANLAR.map(dep => {
                   const kisaAd = { 'İş Analistleri': 'İş Analisti', 'Yazılımcılar': 'Yazılımcı', 'QA/Test Uzmanları': 'QA/Test' };
                   const aktif = secilenDep === dep;
                   return (
-                    <DepFiltreButon key={dep} label={kisaAd[dep]} aktif={aktif}
+                    <FiltreButon key={dep} label={kisaAd[dep]} aktif={aktif}
                       onClick={() => { setSecilenDep(aktif ? '' : dep); setAramaMetni(''); }} />
                   );
                 })}
@@ -252,7 +249,7 @@ const handleSubmit = async (e) => {
                         if (filtrelenmis.length === 0) return (
                           <div style={{ padding: '12px 16px', color: '#555', fontSize: '13px' }}>Sonuç bulunamadı</div>
                         );
-                        const gruplar = secilenDep ? [secilenDep] : ['İş Analistleri', 'Yazılımcılar', 'QA/Test Uzmanları'];
+                        const gruplar = secilenDep ? [secilenDep] : DEPARTMANLAR;
                         return gruplar.map(dep => {
                           const grup = filtrelenmis.filter(c => c.departman === dep);
                           if (grup.length === 0) return null;
@@ -475,25 +472,6 @@ const handleSubmit = async (e) => {
         </form>
       </div>
     </div>
-  );
-}
-
-function DepFiltreButon({ label, aktif, onClick }) {
-  const [hovered, setHovered] = React.useState(false);
-  return (
-    <button type="button"
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        padding: '6px 14px', borderRadius: '20px', cursor: 'pointer',
-        fontSize: '12px', fontWeight: '500',
-        transition: 'background-color 0.15s, color 0.15s, border-color 0.15s',
-        backgroundColor: aktif ? '#4f46e5' : hovered ? '#3f3f4c' : '#303038',
-        border: aktif ? '1px solid #4f46e5' : hovered ? '1px solid #52525f' : '1px solid #40404a',
-        color: aktif ? '#fff' : hovered ? '#e5e7eb' : '#b4b4bd',
-      }}
-    >{label}</button>
   );
 }
 

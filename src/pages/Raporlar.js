@@ -206,6 +206,9 @@ function Raporlar() {
     });
   };
 
+  const ozetSkorRenk = (skor) => skor >= 80 ? '#34d399' : skor >= 60 ? '#fbbf24' : '#fb7185';
+  const kategoriRenk = (puan) => puan >= 4 ? '#10b981' : puan >= 3 ? '#f59e0b' : '#f43f5e';
+
   const employeeIdleri = new Set(calisanlar.map(c => c.id));
   const sadeceCalisanSiralama = siralama.filter(s => employeeIdleri.has(s.id));
 
@@ -227,6 +230,7 @@ function Raporlar() {
         .dropdown-scroll::-webkit-scrollbar-thumb { background: #374151; border-radius: 99px; }
         .dropdown-scroll::-webkit-scrollbar-thumb:hover { background: #4b5563; }
         .panel-select:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.25); }
+        .recharts-wrapper:focus, .recharts-wrapper *:focus, .recharts-surface:focus { outline: none !important; }
       `}</style>
       <Sidebar />
       <div style={styles.icerik}>
@@ -286,11 +290,13 @@ function Raporlar() {
         {grafikVerisi.length > 0 && (
           <div style={styles.kart}>
             <div style={styles.kartBaslik}>{rol === 'Employee' ? 'Performans Grafiğim' : 'Çalışan Performans Grafiği'}</div>
+            <div style={{ overflowX: 'auto', marginTop: '8px' }}>
+            <div style={{ minWidth: '100%', width: `${grafikVerisi.length * 90}px` }}>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={grafikVerisi} margin={{ top: 10, right: 20, left: 0, bottom: 20 }} barSize={grafikVerisi.length === 1 ? 80 : undefined}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                <XAxis dataKey="name" tick={{ fill: '#a0a0a0', fontSize: 12 }} />
-                <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fill: '#a0a0a0', fontSize: 12 }} />
+                <XAxis dataKey="name" tick={{ fill: '#a0a0a0', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fill: '#a0a0a0', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: 'rgba(15,23,42,0.8)',
@@ -303,17 +309,19 @@ function Raporlar() {
                   formatter={(val) => [`${val}`, 'Skor']}
                   cursor={false}
                 />
-                <Bar dataKey="skor" radius={[4, 4, 0, 0]} activeBar={false}>
-                  {grafikVerisi.map((_, i) => (
+                <Bar dataKey="skor" radius={[4, 4, 0, 0]} maxBarSize={64} activeBar={false}>
+                  {grafikVerisi.map((d, i) => (
                     <Cell
                       key={i}
-                      fill={rol === 'Employee' ? '#4f46e5' : (i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : '#4f46e5')}
-                      fillOpacity={rol !== 'Employee' && i >= 3 ? 0.8 : 1}
+                      fill={rol === 'Employee' ? '#6366f1' : (i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : '#4f46e5')}
+                      fillOpacity={rol === 'Employee' ? (panelDonem && d.name !== panelDonem ? 0.4 : 1) : (i >= 3 ? 0.8 : 1)}
                     />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            </div>
+            </div>
           </div>
         )}
 
@@ -325,9 +333,9 @@ function Raporlar() {
               <>
                 {employeeGrafik.length > 0 && (
                   <>
-                    <div style={{ textAlign: 'center', margin: '20px 0 24px' }}>
-                      <div style={{ fontSize: '13px', color: '#a0a0a0', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px' }}>Genel Ortalama</div>
-                      <div style={{ fontSize: '48px', fontWeight: '700', color: '#4f46e5' }}>
+                    <div style={{ textAlign: 'center', margin: '16px 0 24px' }}>
+                      <div style={styles.heroEtiket}>Genel Ortalama</div>
+                      <div style={{ fontSize: '48px', fontWeight: '700', color: '#f8fafc' }}>
                         {(employeeGrafik.reduce((s, x) => s + x.skor, 0) / employeeGrafik.length).toFixed(1)}
                       </div>
                     </div>
@@ -339,17 +347,17 @@ function Raporlar() {
                           style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             padding: '12px 16px', borderRadius: '8px', cursor: 'pointer',
-                            backgroundColor: panelDonem === d.name ? '#2a2a3a' : '#1c1c1c',
-                            border: `1px solid ${panelDonem === d.name ? '#4f46e5' : '#2a2a2a'}`,
+                            backgroundColor: panelDonem === d.name ? 'rgba(99,102,241,0.1)' : 'transparent',
+                            borderLeft: `2px solid ${panelDonem === d.name ? '#6366f1' : 'transparent'}`,
                             transition: 'all 0.15s'
                           }}
                         >
                           <span style={{ fontSize: '14px', color: '#e0e0e0', fontWeight: '500' }}>{d.name}</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ width: '120px', height: '6px', backgroundColor: '#333', borderRadius: '3px', overflow: 'hidden' }}>
-                              <div style={{ width: `${d.skor}%`, height: '100%', backgroundColor: '#4f46e5', borderRadius: '3px' }} />
+                            <div style={{ width: '120px', height: '6px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '99px', overflow: 'hidden' }}>
+                              <div style={{ width: `${d.skor}%`, height: '100%', backgroundColor: ozetSkorRenk(d.skor), borderRadius: '99px' }} />
                             </div>
-                            <span style={{ fontSize: '15px', fontWeight: '700', color: '#4f46e5', minWidth: '40px', textAlign: 'right' }}>{d.skor}</span>
+                            <span style={{ fontSize: '15px', fontWeight: '700', color: ozetSkorRenk(d.skor), minWidth: '40px', textAlign: 'right' }}>{d.skor}</span>
                           </div>
                         </div>
                       ))}
@@ -412,7 +420,7 @@ function Raporlar() {
                       <td style={{ ...styles.td, fontWeight: i < 3 ? '600' : '400' }}>{s.ad} {s.soyad}</td>
                       <td style={{ ...styles.td, textAlign: 'center' }}>{s.departman}</td>
                       <td style={{ ...styles.td, textAlign: 'right' }}>
-                        <span style={styles.skorText}>
+                        <span style={{ fontWeight: '600', color: ozetSkorRenk(s.ortalamaToplamSkor) }}>
                           {s.ortalamaToplamSkor ? s.ortalamaToplamSkor.toFixed(2) : '-'}
                         </span>
                       </td>
@@ -448,15 +456,15 @@ function Raporlar() {
               </div>
               {skorDetay ? (
                 <>
+                  <div style={styles.heroEtiket}>Toplam Skor</div>
                   <div style={styles.skorBuyuk}>{typeof skorDetay.toplamSkor === 'number' ? skorDetay.toplamSkor.toFixed(1) : skorDetay.toplamSkor}</div>
-                  <div style={styles.skorAlt}>Toplam Skor</div>
                   <div style={styles.kategoriListesi}>
                     {skorDetay.kategoriDetay && skorDetay.kategoriDetay.map((k, i) => (
                       <div key={i} style={styles.kategoriSatir}>
                         <div style={styles.kategoriAdi}>{k.baslik}</div>
                         <div style={styles.kategoriSag}>
                           <div style={styles.barContainer}>
-                            <div style={{ ...styles.bar, width: `${(k.ortalamaPuan / 5) * 100}%` }} />
+                            <div style={{ ...styles.bar, width: `${(k.ortalamaPuan / 5) * 100}%`, backgroundColor: kategoriRenk(k.ortalamaPuan) }} />
                           </div>
                           <span style={styles.kategoriPuan}>
                             {k.ortalamaPuan ? k.ortalamaPuan.toFixed(1) : '-'}
@@ -505,9 +513,8 @@ const styles = {
   td: { padding: '16px', fontSize: '14px', color: '#e0e0e0', whiteSpace: 'nowrap' },
   siraNo: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', borderRadius: '50%', fontSize: '12px', fontWeight: '700' },
   siraNoDuz: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', fontSize: '12px', fontWeight: '600', color: '#64748b' },
-  skorText: { fontWeight: '500', color: '#e0e0e0' },
-  skorBuyuk: { fontSize: '48px', fontWeight: '700', color: '#818cf8', textAlign: 'center', marginBottom: '4px', marginTop: '8px' },
-  skorAlt: { fontSize: '13px', color: '#a0a0a0', textAlign: 'center', marginBottom: '28px' },
+  heroEtiket: { fontSize: '13px', color: '#a0a0a0', textAlign: 'center', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px' },
+  skorBuyuk: { fontSize: '48px', fontWeight: '700', color: '#f8fafc', textAlign: 'center', marginBottom: '28px' },
   kategoriListesi: { display: 'flex', flexDirection: 'column', gap: '16px' },
   kategoriSatir: { display: 'flex', alignItems: 'center', gap: '16px' },
   kategoriAdi: { fontSize: '13px', color: '#e0e0e0', minWidth: '130px', lineHeight: '1', flexShrink: 0 },

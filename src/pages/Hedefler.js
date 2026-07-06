@@ -1,44 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
-
-const IconCheck = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12"/>
-  </svg>
-);
-const IconEdit = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-  </svg>
-);
-const IconTrash = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6"/>
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-    <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-  </svg>
-);
-const IconRotateCcw = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="1 4 1 10 7 10"/>
-    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-  </svg>
-);
-const IconClock = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-  </svg>
-);
-const IconCalendar = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-  </svg>
-);
+import { IconCheck, IconEdit, IconTrash, IconRotateCcw, IconClock, IconCalendar } from '../components/icons';
 
 function Hedefler() {
   const rol = localStorage.getItem('rol');
+  const kullaniciDepartman = localStorage.getItem('departman');
   const [hedefler, setHedefler] = useState([]);
   const [calisanlar, setCalisanlar] = useState([]);
   const [modalAcik, setModalAcik] = useState(false);
@@ -51,18 +18,22 @@ function Hedefler() {
   const [duzenleAciklama, setDuzenleAciklama] = useState('');
   const [duzenleBitis, setDuzenleBitis] = useState('');
 
-  const hedefleriGetir = () => {
-    api.get('/Hedefler').then(res => setHedefler(res.data)).catch(() => {});
-  };
+  const hedefleriGetir = useCallback(() => {
+    api.get('/Hedefler').then(res => {
+      const tumHedefler = res.data;
+      const filtreli = rol === 'Evaluator' ? tumHedefler.filter(h => h.departman === kullaniciDepartman) : tumHedefler;
+      setHedefler(filtreli);
+    }).catch(() => {});
+  }, [rol, kullaniciDepartman]);
 
   useEffect(() => {
     hedefleriGetir();
     if (rol === 'Admin' || rol === 'Evaluator') {
       api.get('/Kullanicilar').then(res => {
-        setCalisanlar(res.data.filter(k => k.rol === 'Employee' && k.aktifMi));
+        setCalisanlar(res.data.filter(k => k.rol === 'Employee' && k.aktifMi && (rol === 'Admin' || k.departman === kullaniciDepartman)));
       }).catch(() => {});
     }
-  }, [rol]);
+  }, [rol, kullaniciDepartman, hedefleriGetir]);
 
   const hedefEkle = async () => {
     if (!secilenCalisan || !aciklama || !bitisTarihi) {
@@ -89,8 +60,13 @@ function Hedefler() {
 
   const tamamla = async (hedefId, tamamlandi) => {
     const endpoint = tamamlandi ? `/Hedefler/${hedefId}/geriAl` : `/Hedefler/${hedefId}/tamamla`;
-    await api.put(endpoint).catch(() => {});
-    hedefleriGetir();
+    try {
+      await api.put(endpoint);
+      setHata('');
+      hedefleriGetir();
+    } catch (err) {
+      setHata(err.response?.data?.mesaj || 'İşlem sırasında hata oluştu.');
+    }
   };
 
   const duzenleAc = (h) => {
@@ -117,8 +93,13 @@ function Hedefler() {
   };
 
   const sil = async (hedefId) => {
-    await api.delete(`/Hedefler/${hedefId}`).catch(() => {});
-    hedefleriGetir();
+    try {
+      await api.delete(`/Hedefler/${hedefId}`);
+      setHata('');
+      hedefleriGetir();
+    } catch (err) {
+      setHata(err.response?.data?.mesaj || 'Hedef silinirken hata oluştu.');
+    }
   };
 
   const bugun = new Date();
@@ -137,18 +118,21 @@ function Hedefler() {
 
     return (
       <div style={{
-        backgroundColor: '#1c1c1c',
-        borderRadius: '8px',
-        padding: '16px 20px',
-        border: gecti ? '1px solid rgba(244,63,94,0.2)' : '1px solid #2a2a2a',
-        borderLeft: `4px solid ${solCizgi}`,
+        position: 'relative',
+        overflow: 'hidden',
+        backgroundColor: '#121212',
+        border: '1px solid rgba(255,255,255,0.05)',
+        padding: '16px 20px 16px 24px',
+        borderRadius: '12px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
         height: '100%',
         boxSizing: 'border-box',
         gap: '12px',
+        minWidth: 0,
       }}>
+        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', backgroundColor: solCizgi }} />
         {/* Üst: isim + hedef metni */}
         <div>
           {(rol === 'Admin' || rol === 'Evaluator') && (
@@ -251,6 +235,8 @@ function Hedefler() {
           )}
         </div>
 
+        {hata && <div style={styles.hataKutu}>{hata}</div>}
+
         <div style={styles.bolum}>
           <div style={styles.bolumBaslik}>
             Aktif Hedefler
@@ -258,7 +244,7 @@ function Hedefler() {
           </div>
           {aktifHedefler.length === 0
             ? <div style={styles.bos}>Aktif hedef bulunmuyor.</div>
-            : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: '10px', alignItems: 'stretch' }}>
+            : <div style={styles.kartGrid}>
                 {aktifHedefler.map((h, i) => <HedefKart key={i} h={h} />)}
               </div>
           }
@@ -270,7 +256,7 @@ function Hedefler() {
               Süresi Geçmiş
               <span style={{ ...styles.sayi, backgroundColor: '#7f1d1d', color: '#f87171' }}>{suresiGecmis.length}</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: '10px', alignItems: 'stretch' }}>
+            <div style={styles.kartGrid}>
               {suresiGecmis.map((h, i) => <HedefKart key={i} h={h} />)}
             </div>
           </div>
@@ -282,7 +268,7 @@ function Hedefler() {
               Tamamlananlar
               <span style={{ ...styles.sayi, backgroundColor: '#166534', color: '#4ade80' }}>{tamamlananlar.length}</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(480px, 1fr))', gap: '10px', alignItems: 'stretch' }}>
+            <div style={styles.kartGrid}>
               {tamamlananlar.map((h, i) => <HedefKart key={i} h={h} />)}
             </div>
           </div>
@@ -363,8 +349,9 @@ const styles = {
   baslik: { fontSize: '24px', fontWeight: '600', color: '#ffffff', margin: '0 0 6px' },
   altBaslik: { fontSize: '14px', color: '#a0a0a0', margin: 0 },
   ekleButon: { padding: '10px 20px', backgroundColor: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
-  bolum: { backgroundColor: '#242424', borderRadius: '8px', padding: '24px', border: '1px solid #2a2a2a', marginBottom: '20px' },
-  bolumBaslik: { fontSize: '15px', fontWeight: '600', color: '#fff', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' },
+  bolum: { marginBottom: '28px' },
+  bolumBaslik: { fontSize: '15px', fontWeight: '600', color: '#fff', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' },
+  kartGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' },
   sayi: { fontSize: '12px', backgroundColor: '#2a2a2a', color: '#a0a0a0', padding: '2px 8px', borderRadius: '12px', fontWeight: '500' },
   bos: { fontSize: '14px', color: '#a0a0a0' },
   modalArka: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
