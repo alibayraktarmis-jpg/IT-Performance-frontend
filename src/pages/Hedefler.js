@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
-import { IconCheck, IconEdit, IconTrash, IconRotateCcw, IconClock, IconCalendar } from '../components/icons';
+import { IconCheck, IconEdit, IconTrash, IconRotateCcw, IconClock, IconCalendar, IconAlertTriangle } from '../components/icons';
 
 function Hedefler() {
   const rol = localStorage.getItem('rol');
@@ -17,6 +17,7 @@ function Hedefler() {
   const [duzenlenecekHedef, setDuzenlenecekHedef] = useState(null);
   const [duzenleAciklama, setDuzenleAciklama] = useState('');
   const [duzenleBitis, setDuzenleBitis] = useState('');
+  const [silinecekId, setSilinecekId] = useState(null);
 
   const hedefleriGetir = useCallback(() => {
     api.get('/Hedefler').then(res => {
@@ -92,9 +93,11 @@ function Hedefler() {
     }
   };
 
-  const sil = async (hedefId) => {
+  const silOnayla = async () => {
+    const id = silinecekId;
+    setSilinecekId(null);
     try {
-      await api.delete(`/Hedefler/${hedefId}`);
+      await api.delete(`/Hedefler/${id}`);
       setHata('');
       hedefleriGetir();
     } catch (err) {
@@ -200,7 +203,7 @@ function Hedefler() {
                 </button>
                 <button
                   title="Sil"
-                  onClick={() => sil(h.id)}
+                  onClick={() => setSilinecekId(h.id)}
                   onMouseEnter={() => setHovBtn('sil')}
                   onMouseLeave={() => setHovBtn(null)}
                   style={{
@@ -223,6 +226,15 @@ function Hedefler() {
 
   return (
     <div style={styles.sayfa}>
+      <style>{`
+        .sil-modal-iptal:hover {
+          color: #fff !important;
+          background-color: rgba(255, 255, 255, 0.05) !important;
+        }
+        .sil-modal-sil:hover {
+          background-color: #e11d48 !important;
+        }
+      `}</style>
       <Sidebar />
       <div style={styles.icerik}>
         <div style={styles.topBar}>
@@ -338,6 +350,20 @@ function Hedefler() {
           </div>
         </div>
       )}
+
+      {silinecekId && (
+        <div style={styles.silModalArka} onClick={() => setSilinecekId(null)}>
+          <div style={styles.silModal} onClick={e => e.stopPropagation()}>
+            <div style={styles.silIkonKapsayici}><IconAlertTriangle size={24} /></div>
+            <h3 style={styles.silBaslik}>Hedefi Sil</h3>
+            <p style={styles.silAciklama}>Bu hedefi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.</p>
+            <div style={styles.silButonlar}>
+              <button type="button" className="sil-modal-iptal" onClick={() => setSilinecekId(null)} style={styles.silIptalButon}>İptal</button>
+              <button type="button" className="sil-modal-sil" onClick={silOnayla} style={styles.silOnaylaButon}>Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -363,6 +389,15 @@ const styles = {
   input: { padding: '10px 12px', backgroundColor: '#141414', border: '1px solid #333', borderRadius: '6px', color: '#fff', fontSize: '14px', colorScheme: 'dark' },
   kaydetButon: { flex: 1, padding: '10px', backgroundColor: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
   iptalButon: { flex: 1, padding: '10px', backgroundColor: '#2a2a2a', color: '#a0a0a0', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' },
+
+  silModalArka: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  silModal: { backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', overflow: 'hidden', padding: '36px', width: '100%', maxWidth: '480px', margin: '0 20px', textAlign: 'center', boxSizing: 'border-box' },
+  silIkonKapsayici: { width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'rgba(244,63,94,0.1)', color: '#f43f5e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' },
+  silBaslik: { fontSize: '18px', fontWeight: '600', color: '#fff', margin: '0 0 8px' },
+  silAciklama: { color: '#94a3b8', fontSize: '14px', lineHeight: '1.6', margin: '0 0 24px' },
+  silButonlar: { display: 'flex', justifyContent: 'flex-end', gap: '12px' },
+  silIptalButon: { padding: '8px 16px', fontSize: '14px', fontWeight: '500', color: '#cbd5e1', backgroundColor: 'transparent', border: 'none', borderRadius: '8px', cursor: 'pointer', transition: 'color 0.15s, background-color 0.15s' },
+  silOnaylaButon: { padding: '8px 16px', fontSize: '14px', fontWeight: '500', color: '#fff', backgroundColor: '#f43f5e', border: 'none', borderRadius: '8px', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(244,63,94,0.25)', transition: 'all 0.15s' },
 };
 
 export default Hedefler;

@@ -22,6 +22,7 @@ function Kriterler() {
   const [hata, setHata] = useState('');
   const [hoveredEkleKart, setHoveredEkleKart] = useState(null);
   const [hoveredAnaButon, setHoveredAnaButon] = useState(false);
+  const [silinecek, setSilinecek] = useState(null); // { tip: 'baslik' | 'altKriter', id }
 
   useEffect(() => { verileriGetir(); }, []);
 
@@ -94,25 +95,15 @@ function Kriterler() {
     } catch { setHata('Hata oluştu.'); }
   };
 
-  const baslikSil = async (id) => {
-    if (!window.confirm('Bu ana başlığı silmek istediğinize emin misiniz?')) return;
+  const silOnayla = async () => {
+    const { tip, id } = silinecek;
+    setSilinecek(null);
     try {
-      await api.delete(`/AnaBasliklar/${id}`);
+      await api.delete(tip === 'baslik' ? `/AnaBasliklar/${id}` : `/AltKriterler/${id}`);
       setHata('');
       verileriGetir();
     } catch (err) {
-      setHata(err.response?.data?.mesaj || 'Ana başlık silinirken hata oluştu.');
-    }
-  };
-
-  const altKriterSil = async (id) => {
-    if (!window.confirm('Bu alt kriteri silmek istediğinize emin misiniz?')) return;
-    try {
-      await api.delete(`/AltKriterler/${id}`);
-      setHata('');
-      verileriGetir();
-    } catch (err) {
-      setHata(err.response?.data?.mesaj || 'Alt kriter silinirken hata oluştu.');
+      setHata(err.response?.data?.mesaj || (tip === 'baslik' ? 'Ana başlık silinirken hata oluştu.' : 'Alt kriter silinirken hata oluştu.'));
     }
   };
 
@@ -195,6 +186,13 @@ function Kriterler() {
         .alt-kriter-satir:hover {
           background-color: rgba(255, 255, 255, 0.05);
         }
+        .sil-modal-iptal:hover {
+          color: #fff !important;
+          background-color: rgba(255, 255, 255, 0.05) !important;
+        }
+        .sil-modal-sil:hover {
+          background-color: #e11d48 !important;
+        }
       `}</style>
       <Sidebar />
       <div style={styles.icerik}>
@@ -261,7 +259,7 @@ function Kriterler() {
                   </button>
                   <button
                     title="Sil"
-                    onClick={() => baslikSil(ab.id)}
+                    onClick={() => setSilinecek({ tip: 'baslik', id: ab.id })}
                     className="sil-buton"
                     style={styles.ikonButon}
                   >
@@ -321,7 +319,7 @@ function Kriterler() {
                         </button>
                         <button
                           title="Sil"
-                          onClick={() => altKriterSil(ak.id)}
+                          onClick={() => setSilinecek({ tip: 'altKriter', id: ak.id })}
                           className="sil-buton"
                           style={styles.kucukIkonButon}
                         >
@@ -487,6 +485,25 @@ function Kriterler() {
             </div>
           </div>
         )}
+
+        {/* Sil Onay Modalı */}
+        {silinecek && (
+          <div style={styles.modalArkaplan} onClick={() => setSilinecek(null)}>
+            <div style={styles.silModal} onClick={e => e.stopPropagation()}>
+              <div style={styles.silIkonKapsayici}><IconAlertTriangle size={24} /></div>
+              <h3 style={styles.silBaslik}>{silinecek.tip === 'baslik' ? 'Ana Başlığı Sil' : 'Alt Kriteri Sil'}</h3>
+              <p style={styles.silAciklama}>
+                {silinecek.tip === 'baslik'
+                  ? 'Bu ana başlığı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.'
+                  : 'Bu alt kriteri silmek istediğinize emin misiniz? Bu işlem geri alınamaz.'}
+              </p>
+              <div style={styles.silButonlar}>
+                <button type="button" className="sil-modal-iptal" onClick={() => setSilinecek(null)} style={styles.silIptalButon}>İptal</button>
+                <button type="button" className="sil-modal-sil" onClick={silOnayla} style={styles.silOnaylaButon}>Sil</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -570,6 +587,14 @@ const styles = {
   modalButonlar: { display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px' },
   iptalButon: { padding: '9px 18px', backgroundColor: 'transparent', color: '#6b7280', border: '1px solid #2d2d2d', borderRadius: '6px', fontSize: '13px', cursor: 'pointer' },
   kaydetButon: { padding: '9px 18px', backgroundColor: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
+
+  silModal: { backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', overflow: 'hidden', padding: '36px', width: '100%', maxWidth: '480px', margin: '0 20px', textAlign: 'center', boxSizing: 'border-box' },
+  silIkonKapsayici: { width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'rgba(244,63,94,0.1)', color: '#f43f5e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' },
+  silBaslik: { fontSize: '18px', fontWeight: '600', color: '#fff', margin: '0 0 8px' },
+  silAciklama: { color: '#94a3b8', fontSize: '14px', lineHeight: '1.6', margin: '0 0 24px' },
+  silButonlar: { display: 'flex', justifyContent: 'flex-end', gap: '12px' },
+  silIptalButon: { padding: '8px 16px', fontSize: '14px', fontWeight: '500', color: '#cbd5e1', backgroundColor: 'transparent', border: 'none', borderRadius: '8px', cursor: 'pointer', transition: 'color 0.15s, background-color 0.15s' },
+  silOnaylaButon: { padding: '8px 16px', fontSize: '14px', fontWeight: '500', color: '#fff', backgroundColor: '#f43f5e', border: 'none', borderRadius: '8px', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(244,63,94,0.25)', transition: 'all 0.15s' },
 };
 
 export default Kriterler;

@@ -85,6 +85,27 @@ function CustomSelect({ value, onChange, gruplar, placeholder = 'Seçin...', hid
     </div>
   );
 }
+const barRenk = (i, rol) => rol === 'Employee' ? '#6366f1' : (i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : '#4f46e5');
+const barRenkGlow = { '#f59e0b': 'rgba(245,158,11,0.9)', '#94a3b8': 'rgba(148,163,184,0.9)', '#b45309': 'rgba(180,83,9,0.9)', '#4f46e5': 'rgba(99,102,241,0.9)', '#6366f1': 'rgba(99,102,241,0.9)' };
+
+function ParlayanEksenEtiketi({ x, y, payload, highlight, renk }) {
+  const aktif = highlight && payload.value === highlight;
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        dy={12}
+        textAnchor="middle"
+        fill={aktif ? renk : '#a0a0a0'}
+        fontSize={12}
+        fontWeight={aktif ? 700 : 400}
+        style={aktif ? { filter: `drop-shadow(0 0 6px ${barRenkGlow[renk] || 'rgba(129,140,248,0.9)'})` } : undefined}
+      >
+        {payload.value}
+      </text>
+    </g>
+  );
+}
+
 function Raporlar() {
   const [siralama, setSiralama] = useState([]);
   const [skorDetay, setSkorDetay] = useState(null);
@@ -197,11 +218,14 @@ function Raporlar() {
   };
 
   const dosyaIndir = (endpoint, dosyaAdi) => {
-    api.get(`/Degerlendirmeler/${endpoint}`, { responseType: 'blob' }).then(res => {
+    const params = secilenDonem ? `?donem=${encodeURIComponent(secilenDonem)}` : '';
+    const adiSonEk = secilenDonem ? `_${secilenDonem.replace(/\s+/g, '')}` : '';
+    const [taban, uzanti] = dosyaAdi.split('.');
+    api.get(`/Degerlendirmeler/${endpoint}${params}`, { responseType: 'blob' }).then(res => {
       const url = window.URL.createObjectURL(res.data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = dosyaAdi;
+      a.download = `${taban}${adiSonEk}.${uzanti}`;
       a.click();
     });
   };
@@ -211,6 +235,10 @@ function Raporlar() {
 
   const employeeIdleri = new Set(calisanlar.map(c => c.id));
   const sadeceCalisanSiralama = siralama.filter(s => employeeIdleri.has(s.id));
+  const secilenCalisanAdi = (() => {
+    const bulunan = sadeceCalisanSiralama.find(s => s.id === secilenCalisan);
+    return bulunan ? `${bulunan.ad} ${bulunan.soyad}` : '';
+  })();
 
   const grafikVerisi = rol === 'Employee'
     ? employeeGrafik
@@ -220,6 +248,10 @@ function Raporlar() {
           name: `${s.ad} ${s.soyad}`,
           skor: parseFloat(s.ortalamaToplamSkor.toFixed(2))
         }));
+
+  const highlightAdi = rol === 'Employee' ? panelDonem : secilenCalisanAdi;
+  const highlightIndex = grafikVerisi.findIndex(d => d.name === highlightAdi);
+  const highlightRenk = highlightIndex >= 0 ? barRenk(highlightIndex, rol) : '#818cf8';
 
   return (
     <div style={styles.sayfa}>
@@ -295,7 +327,7 @@ function Raporlar() {
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={grafikVerisi} margin={{ top: 10, right: 20, left: 0, bottom: 20 }} barSize={grafikVerisi.length === 1 ? 80 : undefined}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                <XAxis dataKey="name" tick={{ fill: '#a0a0a0', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" interval={0} tick={<ParlayanEksenEtiketi highlight={highlightAdi} renk={highlightRenk} />} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fill: '#a0a0a0', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <Tooltip
                   contentStyle={{
@@ -313,7 +345,7 @@ function Raporlar() {
                   {grafikVerisi.map((d, i) => (
                     <Cell
                       key={i}
-                      fill={rol === 'Employee' ? '#6366f1' : (i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : '#4f46e5')}
+                      fill={barRenk(i, rol)}
                       fillOpacity={rol === 'Employee' ? (panelDonem && d.name !== panelDonem ? 0.4 : 1) : (i >= 3 ? 0.8 : 1)}
                     />
                   ))}

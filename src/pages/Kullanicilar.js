@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
-import { IconEdit, IconPower, IconTrash, IconPlus } from '../components/icons';
+import { IconEdit, IconPower, IconTrash, IconPlus, IconAlertTriangle } from '../components/icons';
 import { DEPARTMANLAR } from '../constants/departmanlar';
 
 function IslemBtn({ onClick, icon: Icon, variant = 'edit', title }) {
@@ -45,6 +45,7 @@ function SelectWrap({ children }) {
 }
 
 function Kullanicilar() {
+  const kendiId = parseInt(localStorage.getItem('id'));
   const [kullanicilar, setKullanicilar] = useState([]);
   const [modalAcik, setModalAcik] = useState(false);
   const [yeniKullanici, setYeniKullanici] = useState({
@@ -56,6 +57,10 @@ function Kullanicilar() {
   const [aramaMetni, setAramaMetni] = useState('');
   const [duzenleModalAcik, setDuzenleModalAcik] = useState(false);
   const [duzenlenecek, setDuzenlenecek] = useState(null);
+  const [silinecekId, setSilinecekId] = useState(null);
+  const [siralamaSutun, setSiralamaSutun] = useState(null);
+  const [siralamaYon, setSiralamaYon] = useState('asc');
+  const [gorunum, setGorunum] = useState('liste');
 
   useEffect(() => {
     kullanicilariGetir();
@@ -109,8 +114,9 @@ function Kullanicilar() {
     }
   };
 
-  const kullaniciSil = async (id) => {
-    if (!window.confirm('Bu kullanıcıyı silmek istediğinize emin misiniz?')) return;
+  const kullaniciSilOnayla = async () => {
+    const id = silinecekId;
+    setSilinecekId(null);
     try {
       await api.delete(`/Kullanicilar/${id}`);
       setHata('');
@@ -119,6 +125,43 @@ function Kullanicilar() {
       setHata(err.response?.data?.mesaj || 'Kullanıcı silinirken hata oluştu.');
     }
   };
+
+  const sutunaTikla = (sutun) => {
+    if (siralamaSutun === sutun) {
+      setSiralamaYon(y => y === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSiralamaSutun(sutun);
+      setSiralamaYon('asc');
+    }
+  };
+
+  const rolSirasi = { Admin: 0, Evaluator: 1, Employee: 2 };
+
+  const siralamaDegeri = (k, sutun) => {
+    switch (sutun) {
+      case 'ad': return `${k.ad} ${k.soyad}`;
+      case 'email': return k.email || '';
+      case 'departman': return k.departman || (k.rol === 'Admin' ? 'Yönetim' : '');
+      case 'durum': return k.aktifMi ? 'Aktif' : 'Pasif';
+      default: return '';
+    }
+  };
+
+  const siraliBaslik = (sutun, etiket) => (
+    <th
+      style={{ ...styles.th, cursor: 'pointer', userSelect: 'none' }}
+      onClick={() => sutunaTikla(sutun)}
+    >
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+        {etiket}
+        <span style={{ fontSize: '9px', color: siralamaSutun === sutun ? '#818cf8' : '#4b5563' }}>
+          {siralamaSutun === sutun && siralamaYon === 'desc' ? '▼' : '▲'}
+        </span>
+      </span>
+    </th>
+  );
+
+  const aramaEslesiyorMu = (c) => !!aramaMetni && `${c.ad} ${c.soyad}`.toLowerCase().includes(aramaMetni.toLowerCase());
 
   return (
     <div style={styles.sayfa}>
@@ -131,6 +174,18 @@ function Kullanicilar() {
         .modal-iptal:hover {
           color: #fff !important;
           background-color: rgba(55, 65, 81, 0.5) !important;
+        }
+        .sil-modal-iptal:hover {
+          color: #fff !important;
+          background-color: rgba(255, 255, 255, 0.05) !important;
+        }
+        .sil-modal-sil:hover {
+          background-color: #e11d48 !important;
+        }
+        .siralama-sifirla:hover {
+          color: #f3f4f6 !important;
+          border-color: #6366f1 !important;
+          background-color: rgba(99, 102, 241, 0.08) !important;
         }
         select.kul-input {
           appearance: none;
@@ -151,6 +206,22 @@ function Kullanicilar() {
             <h2 style={styles.baslik}>Kullanıcılar</h2>
             <p style={styles.altBaslik}>Sistemdeki tüm kullanıcıları yönetin</p>
           </div>
+          <div style={styles.gorunumGrup}>
+            <button
+              type="button"
+              onClick={() => setGorunum('liste')}
+              style={{ ...styles.gorunumButon, ...(gorunum === 'liste' ? styles.gorunumButonAktif : {}) }}
+            >
+              Liste
+            </button>
+            <button
+              type="button"
+              onClick={() => setGorunum('ekipler')}
+              style={{ ...styles.gorunumButon, ...(gorunum === 'ekipler' ? styles.gorunumButonAktif : {}) }}
+            >
+              Ekipler
+            </button>
+          </div>
         </div>
 
         {basari && <div style={styles.basariKutusu}>{basari}</div>}
@@ -158,35 +229,48 @@ function Kullanicilar() {
 
         {/* Arama + Eylem Satırı */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '16px' }}>
-          <div style={{ position: 'relative', width: '288px' }}>
-            <svg
-              style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6b7280' }}
-              width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input
-              className="kul-input"
-              style={{ ...styles.aramaInput }}
-              placeholder="İsim ara..."
-              value={aramaMetni}
-              onChange={e => setAramaMetni(e.target.value)}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ position: 'relative', width: '288px' }}>
+              <svg
+                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6b7280' }}
+                width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                className="kul-input"
+                style={{ ...styles.aramaInput }}
+                placeholder="İsim ara..."
+                value={aramaMetni}
+                onChange={e => setAramaMetni(e.target.value)}
+              />
+            </div>
+            {siralamaSutun && (
+              <button
+                type="button"
+                className="siralama-sifirla"
+                onClick={() => { setSiralamaSutun(null); setSiralamaYon('asc'); }}
+                style={styles.siralamaSifirlaButon}
+              >
+                Sıralamayı Sıfırla
+              </button>
+            )}
           </div>
           <button onClick={() => setModalAcik(true)} style={styles.ekleButon}>
             <IconPlus /> Yeni Kullanıcı
           </button>
         </div>
 
+        {gorunum === 'liste' && (
         <div style={styles.tablo}>
           <table style={styles.tabloEl}>
             <thead>
               <tr>
-                <th style={styles.th}>Ad Soyad</th>
-                <th style={styles.th}>Email</th>
-                <th style={styles.th}>Rol</th>
-                <th style={styles.th}>Departman</th>
-                <th style={styles.th}>Durum</th>
+                {siraliBaslik('ad', 'Ad Soyad')}
+                {siraliBaslik('email', 'Email')}
+                {siraliBaslik('rol', 'Rol')}
+                {siraliBaslik('departman', 'Departman')}
+                {siraliBaslik('durum', 'Durum')}
                 <th style={styles.th}>İşlem</th>
               </tr>
             </thead>
@@ -194,6 +278,12 @@ function Kullanicilar() {
               {kullanicilar.filter(k => {
                 const q = aramaMetni.toLowerCase();
                 return !q || `${k.ad} ${k.soyad}`.toLowerCase().includes(q);
+              }).sort((a, b) => {
+                if (!siralamaSutun) return 0;
+                const cmp = siralamaSutun === 'rol'
+                  ? (rolSirasi[a.rol] ?? 99) - (rolSirasi[b.rol] ?? 99)
+                  : siralamaDegeri(a, siralamaSutun).localeCompare(siralamaDegeri(b, siralamaSutun), 'tr');
+                return siralamaYon === 'asc' ? cmp : -cmp;
               }).map((k) => (
                 <tr key={k.id} className="kul-satir" style={styles.satir}>
                   <td style={styles.td}>
@@ -223,9 +313,15 @@ function Kullanicilar() {
                   </td>
                   <td style={styles.td}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <IslemBtn variant="edit" icon={IconEdit} title="Düzenle" onClick={() => { setDuzenlenecek({...k}); setDuzenleModalAcik(true); }} />
-                      <IslemBtn variant="toggle" icon={IconPower} title={k.aktifMi ? 'Pasif Yap' : 'Aktif Yap'} onClick={() => aktifPasifYap(k.id, k.aktifMi)} />
-                      <IslemBtn variant="danger" icon={IconTrash} title="Sil" onClick={() => kullaniciSil(k.id)} />
+                      {k.id === kendiId ? (
+                        <span style={{ fontSize: '12px', color: '#818cf8', fontStyle: 'italic' }}>Kendi hesabın</span>
+                      ) : (
+                        <>
+                          <IslemBtn variant="edit" icon={IconEdit} title="Düzenle" onClick={() => { setDuzenlenecek({...k}); setDuzenleModalAcik(true); }} />
+                          <IslemBtn variant="toggle" icon={IconPower} title={k.aktifMi ? 'Pasif Yap' : 'Aktif Yap'} onClick={() => aktifPasifYap(k.id, k.aktifMi)} />
+                          <IslemBtn variant="danger" icon={IconTrash} title="Sil" onClick={() => setSilinecekId(k.id)} />
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -233,6 +329,96 @@ function Kullanicilar() {
             </tbody>
           </table>
         </div>
+        )}
+
+        {gorunum === 'ekipler' && (
+        <div style={styles.ekiplerGrid}>
+          {evaluatorlar.map(ev => {
+            const ekip = kullanicilar.filter(k => k.rol === 'Employee' && k.evaluatorId === ev.id);
+            return (
+              <div key={ev.id} style={styles.ekipKart}>
+                <div style={styles.ekipKartUst}>
+                  <div style={styles.isimKismi}>
+                    <div style={{ ...styles.avatar, backgroundColor: '#0891b2' }}>{ev.ad?.[0]}{ev.soyad?.[0]}</div>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#f3f4f6' }}>{ev.ad} {ev.soyad}</div>
+                      <div style={{ fontSize: '12px', color: '#6b7280' }}>{ev.departman}</div>
+                    </div>
+                  </div>
+                  <span style={styles.ekipSayiBadge}>{ekip.length} çalışan</span>
+                </div>
+                <div style={styles.ekipListesi}>
+                  {ekip.length === 0 ? (
+                    <div style={styles.ekipBosMetin}>Henüz atanmış çalışan yok.</div>
+                  ) : ekip.map(c => {
+                    const eslesti = aramaEslesiyorMu(c);
+                    return (
+                    <div key={c.id} style={{
+                      ...styles.ekipSatir,
+                      opacity: aramaMetni && !eslesti ? 0.35 : 1,
+                      backgroundColor: eslesti ? 'rgba(99,102,241,0.1)' : 'transparent',
+                      borderRadius: '6px', margin: '0 -8px', padding: '4px 8px',
+                      transition: 'opacity 0.15s, background-color 0.15s',
+                    }}>
+                      <div style={styles.isimKismi}>
+                        <div style={{ ...styles.avatar, width: '26px', height: '26px', fontSize: '10px' }}>{c.ad?.[0]}{c.soyad?.[0]}</div>
+                        <span style={{ fontSize: '13px', color: eslesti ? '#818cf8' : (c.aktifMi ? '#d1d5db' : '#4b5563'), fontWeight: eslesti ? '700' : '400' }}>{c.ad} {c.soyad}</span>
+                      </div>
+                      <span style={{
+                        ...styles.durumBadge,
+                        fontSize: '11px', padding: '2px 8px',
+                        backgroundColor: c.aktifMi ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)',
+                        color: c.aktifMi ? '#34d399' : '#fb7185'
+                      }}>
+                        {c.aktifMi ? 'Aktif' : 'Pasif'}
+                      </span>
+                    </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {(() => {
+            const atanmamis = kullanicilar.filter(k => k.rol === 'Employee' && !k.evaluatorId);
+            if (atanmamis.length === 0) return null;
+            return (
+              <div style={{ ...styles.ekipKart, border: '1px solid rgba(244,63,94,0.3)' }}>
+                <div style={styles.ekipKartUst}>
+                  <div style={styles.isimKismi}>
+                    <div style={{ ...styles.avatar, backgroundColor: 'rgba(244,63,94,0.15)', color: '#fb7185' }}>
+                      <IconAlertTriangle size={16} />
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#fb7185' }}>Atanmamış Çalışanlar</div>
+                  </div>
+                  <span style={{ ...styles.ekipSayiBadge, backgroundColor: 'rgba(244,63,94,0.1)', color: '#fb7185' }}>{atanmamis.length} çalışan</span>
+                </div>
+                <div style={styles.ekipListesi}>
+                  {atanmamis.map(c => {
+                    const eslesti = aramaEslesiyorMu(c);
+                    return (
+                    <div key={c.id} style={{
+                      ...styles.ekipSatir,
+                      opacity: aramaMetni && !eslesti ? 0.35 : 1,
+                      backgroundColor: eslesti ? 'rgba(99,102,241,0.1)' : 'transparent',
+                      borderRadius: '6px', margin: '0 -8px', padding: '4px 8px',
+                      transition: 'opacity 0.15s, background-color 0.15s',
+                    }}>
+                      <div style={styles.isimKismi}>
+                        <div style={{ ...styles.avatar, width: '26px', height: '26px', fontSize: '10px' }}>{c.ad?.[0]}{c.soyad?.[0]}</div>
+                        <span style={{ fontSize: '13px', color: eslesti ? '#818cf8' : '#d1d5db', fontWeight: eslesti ? '700' : '400' }}>{c.ad} {c.soyad}</span>
+                      </div>
+                      <span style={{ fontSize: '11px', color: '#6b7280' }}>{c.departman}</span>
+                    </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+        )}
 
         {duzenleModalAcik && duzenlenecek && (
           <div style={styles.modalArkaplan}>
@@ -270,7 +456,15 @@ function Kullanicilar() {
                     <label style={styles.label}>Departman</label>
                     <SelectWrap>
                       <select className="kul-input" style={styles.input} value={duzenlenecek.departman || ''}
-                        onChange={e => setDuzenlenecek({...duzenlenecek, departman: e.target.value})}>
+                        onChange={e => {
+                          const dep = e.target.value;
+                          if (duzenlenecek.rol !== 'Employee') {
+                            setDuzenlenecek({...duzenlenecek, departman: dep});
+                            return;
+                          }
+                          const otomatikEv = evaluatorlar.find(ev => ev.departman === dep);
+                          setDuzenlenecek({...duzenlenecek, departman: dep, evaluatorId: otomatikEv ? otomatikEv.id : null});
+                        }}>
                         <option value="">Seçiniz</option>
                         {DEPARTMANLAR.map(dep => (
                           <option key={dep} value={dep}>{dep}</option>
@@ -349,6 +543,10 @@ function Kullanicilar() {
                       <select className="kul-input" style={styles.input} value={yeniKullanici.departman}
                         onChange={e => {
                           const dep = e.target.value;
+                          if (yeniKullanici.rol !== 'Employee') {
+                            setYeniKullanici({...yeniKullanici, departman: dep});
+                            return;
+                          }
                           const otomatikEv = evaluatorlar.find(ev => ev.departman === dep);
                           setYeniKullanici({...yeniKullanici, departman: dep, evaluatorId: otomatikEv ? otomatikEv.id : null});
                         }} required>
@@ -386,6 +584,22 @@ function Kullanicilar() {
             </div>
           </div>
         )}
+
+        {silinecekId && (
+          <div style={styles.modalArkaplan} onClick={() => setSilinecekId(null)}>
+            <div style={styles.silModal} onClick={e => e.stopPropagation()}>
+              <div style={styles.silIkonKapsayici}><IconAlertTriangle size={24} /></div>
+              <h3 style={{ ...styles.modalBaslik, margin: '0 0 8px' }}>Kullanıcıyı Sil</h3>
+              <p style={{ color: '#94a3b8', fontSize: '14px', lineHeight: '1.6', margin: '0 0 24px' }}>
+                Bu kullanıcıyı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+              </p>
+              <div style={styles.modalButonlar}>
+                <button type="button" className="sil-modal-iptal" onClick={() => setSilinecekId(null)} style={styles.silIptalButon}>İptal</button>
+                <button type="button" className="sil-modal-sil" onClick={kullaniciSilOnayla} style={styles.silOnaylaButon}>Sil</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -398,6 +612,17 @@ const styles = {
   baslik: { fontSize: '24px', fontWeight: '600', color: '#ffffff', margin: '0 0 6px' },
   altBaslik: { fontSize: '14px', color: '#a0a0a0', margin: 0 },
   ekleButon: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', backgroundColor: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
+  siralamaSifirlaButon: { padding: '9px 14px', backgroundColor: 'transparent', color: '#9ca3af', border: '1px solid #3a3a3a', borderRadius: '6px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' },
+  gorunumGrup: { display: 'flex', gap: '4px', backgroundColor: '#242424', border: '1px solid #333', borderRadius: '8px', padding: '4px' },
+  gorunumButon: { padding: '7px 16px', backgroundColor: 'transparent', color: '#9ca3af', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', transition: 'all 0.15s' },
+  gorunumButonAktif: { backgroundColor: '#4f46e5', color: '#fff' },
+  ekiplerGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' },
+  ekipKart: { backgroundColor: '#242424', borderRadius: '10px', padding: '20px', border: '1px solid #2a2a2a' },
+  ekipKartUst: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid #2a2a2a' },
+  ekipSayiBadge: { fontSize: '11px', fontWeight: '600', padding: '3px 10px', backgroundColor: 'rgba(99,102,241,0.1)', color: '#818cf8', borderRadius: '20px', whiteSpace: 'nowrap' },
+  ekipListesi: { display: 'flex', flexDirection: 'column', gap: '10px' },
+  ekipSatir: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  ekipBosMetin: { fontSize: '13px', color: '#4b5563', fontStyle: 'italic' },
   basariKutusu: { backgroundColor: 'rgba(20,83,45,0.3)', border: '1px solid #166534', color: '#4ade80', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
   hataKutusu: { backgroundColor: 'rgba(69,10,10,0.3)', border: '1px solid #991b1b', color: '#f87171', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
   tablo: { backgroundColor: '#242424', borderRadius: '8px', padding: '24px' },
@@ -420,6 +645,10 @@ const styles = {
   modalButonlar: { display: 'flex', justifyContent: 'flex-end', gap: '12px' },
   iptalButon: { padding: '10px 20px', backgroundColor: 'transparent', color: '#d1d5db', border: '1px solid #374151', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', transition: 'color 0.15s, background-color 0.15s' },
   kaydetButon: { padding: '10px 20px', backgroundColor: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
+  silModal: { backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', overflow: 'hidden', padding: '36px', width: '100%', maxWidth: '480px', margin: '0 20px', textAlign: 'center', boxSizing: 'border-box' },
+  silIkonKapsayici: { width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'rgba(244,63,94,0.1)', color: '#f43f5e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' },
+  silIptalButon: { padding: '8px 16px', fontSize: '14px', fontWeight: '500', color: '#cbd5e1', backgroundColor: 'transparent', border: 'none', borderRadius: '8px', cursor: 'pointer', transition: 'color 0.15s, background-color 0.15s' },
+  silOnaylaButon: { padding: '8px 16px', fontSize: '14px', fontWeight: '500', color: '#fff', backgroundColor: '#f43f5e', border: 'none', borderRadius: '8px', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(244,63,94,0.25)', transition: 'all 0.15s' },
 };
 
 export default Kullanicilar;
