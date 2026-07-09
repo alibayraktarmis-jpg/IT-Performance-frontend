@@ -17,6 +17,9 @@ function Login() {
       localStorage.setItem('soyad', response.data.soyad);
       localStorage.setItem('id', response.data.id);
       localStorage.setItem('departman', response.data.departman || '');
+      localStorage.setItem('email', response.data.email || '');
+      localStorage.setItem('kayitTarihi', response.data.kayitTarihi || '');
+      localStorage.setItem('sonGirisTarihi', response.data.sonGirisTarihi || '');
       window.location.href = '/dashboard';
     } catch (err) {
       setHata(err.response?.data?.mesaj || 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.');

@@ -33,6 +33,7 @@ function Sidebar() {
     <div style={styles.sidebar}>
       <style>{`
         .cikis-buton:hover { color: #ef4444 !important; background-color: rgba(239,68,68,0.1) !important; }
+        .profil-link:hover { background-color: rgba(255,255,255,0.05); }
       `}</style>
       <div style={styles.logo}>
         <span style={styles.logoIkon}><IconActivity /></span>
@@ -51,13 +52,20 @@ function Sidebar() {
         {menuItem('/raporlar', 'Raporlar', IconRaporlar)}
       </nav>
       <div style={styles.altKisim}>
-        <div style={styles.kullanici}>
+        <Link
+          to="/profil"
+          className="profil-link"
+          style={{
+            ...styles.kullanici,
+            ...(aktifSayfa === '/profil' ? styles.kullaniciAktif : {}),
+          }}
+        >
           <div style={styles.avatar}>{ad?.[0]}{soyad?.[0]}</div>
           <div>
             <div style={styles.kullaniciAd}>{ad} {soyad}</div>
             <div style={styles.kullaniciRol}>{rol}</div>
           </div>
-        </div>
+        </Link>
         <button onClick={handleLogout} className="cikis-buton" style={styles.cikisButon}>
           <IconLogout />
           Çıkış Yap
@@ -136,7 +144,13 @@ const styles = {
     justifyContent: 'flex-start',
     gap: '12px',
     marginBottom: '16px',
-    paddingLeft: '8px',
+    padding: '6px 8px',
+    borderRadius: '6px',
+    textDecoration: 'none',
+    transition: 'background-color 0.15s',
+  },
+  kullaniciAktif: {
+    backgroundColor: 'rgba(79,70,229,0.15)',
   },
   avatar: {
     width: '36px',

@@ -5,7 +5,6 @@ import { IconCheck, IconEdit, IconTrash, IconRotateCcw, IconClock, IconCalendar,
 
 function Hedefler() {
   const rol = localStorage.getItem('rol');
-  const kullaniciDepartman = localStorage.getItem('departman');
   const [hedefler, setHedefler] = useState([]);
   const [calisanlar, setCalisanlar] = useState([]);
   const [modalAcik, setModalAcik] = useState(false);
@@ -21,20 +20,18 @@ function Hedefler() {
 
   const hedefleriGetir = useCallback(() => {
     api.get('/Hedefler').then(res => {
-      const tumHedefler = res.data;
-      const filtreli = rol === 'Evaluator' ? tumHedefler.filter(h => h.departman === kullaniciDepartman) : tumHedefler;
-      setHedefler(filtreli);
+      setHedefler(res.data);
     }).catch(() => {});
-  }, [rol, kullaniciDepartman]);
+  }, []);
 
   useEffect(() => {
     hedefleriGetir();
     if (rol === 'Admin' || rol === 'Evaluator') {
       api.get('/Kullanicilar').then(res => {
-        setCalisanlar(res.data.filter(k => k.rol === 'Employee' && k.aktifMi && (rol === 'Admin' || k.departman === kullaniciDepartman)));
+        setCalisanlar(res.data.filter(k => k.rol === 'Employee' && k.aktifMi));
       }).catch(() => {});
     }
-  }, [rol, kullaniciDepartman, hedefleriGetir]);
+  }, [rol, hedefleriGetir]);
 
   const hedefEkle = async () => {
     if (!secilenCalisan || !aciklama || !bitisTarihi) {
@@ -54,8 +51,8 @@ function Hedefler() {
       setBitisTarihi('');
       setHata('');
       hedefleriGetir();
-    } catch {
-      setHata('Hedef eklenirken hata oluştu.');
+    } catch (err) {
+      setHata(err.response?.data?.mesaj || 'Hedef eklenirken hata oluştu.');
     }
   };
 
@@ -88,8 +85,8 @@ function Hedefler() {
       setDuzenleModalAcik(false);
       setDuzenlenecekHedef(null);
       hedefleriGetir();
-    } catch {
-      setHata('Güncelleme sırasında hata oluştu.');
+    } catch (err) {
+      setHata(err.response?.data?.mesaj || 'Güncelleme sırasında hata oluştu.');
     }
   };
 

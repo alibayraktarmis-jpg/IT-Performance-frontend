@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
-import { IconUsers, IconUserCheck, IconBarChart, IconActivity, IconTrophy, IconHash, IconCalendar, IconQuote } from '../components/icons';
+import { IconUsers, IconUserCheck, IconBarChart, IconActivity, IconTrophy, IconHash, IconCalendar, IconQuote, IconClock } from '../components/icons';
 import FiltreButon from '../components/FiltreButon';
 import { DEPARTMANLAR } from '../constants/departmanlar';
 
@@ -12,6 +12,7 @@ function Dashboard() {
   const id = localStorage.getItem('id');
   const [skorData, setSkorData] = useState(null);
   const [siralama, setSiralama] = useState([]);
+  const [donemSiralama, setDonemSiralama] = useState([]);
   const [degerlendirmeler, setDegerlendirmeler] = useState([]);
   const [sonDegerlendirme, setSonDegerlendirme] = useState(null);
   const [employeeGrafik, setEmployeeGrafik] = useState([]);
@@ -20,8 +21,36 @@ function Dashboard() {
 
   const skorRenk = (skor) => skor == null ? '#e0e0e0' : skor >= 80 ? '#34d399' : skor >= 60 ? '#fbbf24' : '#fb7185';
 
+  const guncelDonemHesapla = () => {
+    const bugun = new Date();
+    const ceyrek = Math.floor(bugun.getMonth() / 3) + 1;
+    return `${bugun.getFullYear()} Q${ceyrek}`;
+  };
+  const guncelDonem = guncelDonemHesapla();
+
+  // Icinde bulunulan ceyregin kac gun kaldigini ve ne kadarinin gectigini hesaplar;
+  // "Bekleyen Degerlendirme" kartinda aciliyet gostermek icin kullanilir.
+  const donemBilgisiHesapla = () => {
+    const bugun = new Date();
+    const ceyrekBaslangicAy = Math.floor(bugun.getMonth() / 3) * 3;
+    const donemBaslangic = new Date(bugun.getFullYear(), ceyrekBaslangicAy, 1);
+    const donemBitis = new Date(bugun.getFullYear(), ceyrekBaslangicAy + 3, 0);
+    const gunMs = 24 * 60 * 60 * 1000;
+    const toplamGun = Math.round((donemBitis - donemBaslangic) / gunMs) + 1;
+    const kalanGun = Math.max(0, Math.round((donemBitis - bugun) / gunMs));
+    const gecenOran = 1 - (kalanGun / toplamGun);
+    return { kalanGun, gecenOran };
+  };
+  const { kalanGun, gecenOran } = donemBilgisiHesapla();
+  const bekleyenRenk = gecenOran > 0.8
+    ? { renk: '#ef4444', bg: 'rgba(239,68,68,0.1)' }
+    : gecenOran > 0.5
+    ? { renk: '#fbbf24', bg: 'rgba(245,158,11,0.1)' }
+    : { renk: '#60a5fa', bg: 'rgba(59,130,246,0.1)' };
+
   useEffect(() => {
     api.get('/Degerlendirmeler/siralama').then(res => setSiralama(res.data)).catch(() => {});
+    api.get(`/Degerlendirmeler/siralama?donem=${encodeURIComponent(guncelDonem)}`).then(res => setDonemSiralama(res.data)).catch(() => {});
 
     if (rol === 'Employee') {
       api.get(`/Degerlendirmeler/skor/${id}`).then(res => setSkorData(res.data)).catch(() => {});
@@ -50,7 +79,7 @@ function Dashboard() {
         setEmployeeGrafik(grafik);
       }).catch(() => {});
     }
-  }, [id, rol]);
+  }, [id, rol, guncelDonem]);
 
   const genelOrtalama = employeeGrafik.length > 0
     ? (employeeGrafik.reduce((s, x) => s + x.skor, 0) / employeeGrafik.length).toFixed(1)
@@ -159,12 +188,24 @@ function Dashboard() {
               const depFiltreli = siralama.filter(s =>
                 s.rol === 'Employee' && (secilenDep === 'Tümü' ? true : s.departman === secilenDep)
               );
-              const degerlendirilen = depFiltreli.filter(s => s.ortalamaToplamSkor);
-              const ortalama = degerlendirilen.length > 0
-                ? (degerlendirilen.reduce((a, b) => a + b.ortalamaToplamSkor, 0) / degerlendirilen.length).toFixed(1)
+              // Genel Ortalama karti tum zamanlarin ortalamasini gosterir (donem bagimsiz).
+              const degerlendirilenTumZamanlar = depFiltreli.filter(s => s.ortalamaToplamSkor);
+              const ortalama = degerlendirilenTumZamanlar.length > 0
+                ? (degerlendirilenTumZamanlar.reduce((a, b) => a + b.ortalamaToplamSkor, 0) / degerlendirilenTumZamanlar.length).toFixed(1)
                 : '-';
+
+              // Evaluator'da Degerlendirilen/Bekleyen kartlari sadece icinde bulunulan doneme (orn. 2026 Q3)
+              // gore hesaplanir; gecmis donemde yapilmis bir degerlendirme, yeni donem baslayinca "bekleyen"
+              // sayacini tekrar dolduruir. Admin'de Bekleyen karti hic gosterilmedigi icin Degerlendirilen
+              // yine tum-zamanlar mantigiyla kalir (aksi halde tek basina anlamsiz/kafa karistirici olurdu).
+              const donemDepFiltreli = donemSiralama.filter(s =>
+                s.rol === 'Employee' && (secilenDep === 'Tümü' ? true : s.departman === secilenDep)
+              );
+              const degerlendirilenBuDonem = donemDepFiltreli.filter(s => s.ortalamaToplamSkor);
+              const bekleyen = donemDepFiltreli.length - degerlendirilenBuDonem.length;
+              const degerlendirilen = rol === 'Evaluator' ? degerlendirilenBuDonem : degerlendirilenTumZamanlar;
               return (
-                <div style={{ ...styles.kartGrid, gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                <div style={{ ...styles.kartGrid, gridTemplateColumns: rol === 'Evaluator' ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)' }}>
                   <div className="dash-kart" style={styles.kart}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={styles.kartEtiket}>Toplam Çalışan</div>
@@ -179,6 +220,20 @@ function Dashboard() {
                     </div>
                     <div style={styles.kartDeger}>{degerlendirilen.length}</div>
                   </div>
+                  {rol === 'Evaluator' && (
+                    <div className="dash-kart" style={styles.kart}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={styles.kartEtiket}>Bekleyen Değerlendirme</div>
+                        <div style={{ ...styles.kartIkon, backgroundColor: bekleyenRenk.bg, color: bekleyenRenk.renk }}><IconClock size={20} /></div>
+                      </div>
+                      <div style={styles.kartDeger}>{bekleyen}</div>
+                      {bekleyen > 0 && (
+                        <div style={{ fontSize: '13px', fontWeight: '600', color: bekleyenRenk.renk, marginTop: '4px' }}>
+                          {kalanGun > 0 ? `Dönem bitimine ${kalanGun} gün` : 'Dönem bugün bitiyor'}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="dash-kart" style={styles.kart}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={styles.kartEtiket}>{secilenDep === 'Tümü' ? 'Genel Ortalama' : `${secilenDep} Ortalaması`}</div>

@@ -51,7 +51,7 @@ function Kullanicilar() {
   const [yeniKullanici, setYeniKullanici] = useState({
     ad: '', soyad: '', email: '', sifre: '', rol: 'Employee', departman: '', evaluatorId: null
   });
-  const evaluatorlar = kullanicilar.filter(k => k.rol === 'Evaluator');
+  const evaluatorlar = kullanicilar.filter(k => k.rol === 'Evaluator' && k.aktifMi);
   const [hata, setHata] = useState('');
   const [basari, setBasari] = useState('');
   const [aramaMetni, setAramaMetni] = useState('');
@@ -81,8 +81,8 @@ function Kullanicilar() {
       setModalAcik(false);
       setYeniKullanici({ ad: '', soyad: '', email: '', sifre: '', rol: 'Employee', departman: '', evaluatorId: null });
       kullanicilariGetir();
-    } catch {
-      setHata('Kullanıcı eklenirken hata oluştu.');
+    } catch (err) {
+      setHata(err.response?.data?.mesaj || 'Kullanıcı eklenirken hata oluştu.');
       setBasari('');
     }
   };
@@ -108,8 +108,8 @@ function Kullanicilar() {
       setDuzenleModalAcik(false);
       setDuzenlenecek(null);
       kullanicilariGetir();
-    } catch {
-      setHata('Güncelleme sırasında hata oluştu.');
+    } catch (err) {
+      setHata(err.response?.data?.mesaj || 'Güncelleme sırasında hata oluştu.');
       setBasari('');
     }
   };

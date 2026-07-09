@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
-import { DEPARTMANLAR } from '../constants/departmanlar';
+import { DEPARTMANLAR, DEPARTMAN_ROZET_ADI } from '../constants/departmanlar';
 
 function Gecmis() {
   const rol = localStorage.getItem('rol');
@@ -20,7 +20,10 @@ function Gecmis() {
       }).catch(() => {});
     } else {
       api.get('/Kullanicilar').then(res => {
-        const emplar = res.data.filter(k => k.rol === 'Employee' && (rol === 'Admin' || k.departman === kullaniciDepartman));
+        // Backend zaten role gore kapsamı sınırlıyor (Evaluator sadece kendi ekibini, Admin herkesi alır);
+        // burada departmana gore ek bir filtre uygulamak, Evaluator'ın kendi departmanı sonradan
+        // degistirilirse (localStorage'daki eski deger yuzunden) kendi ekibinin gorunmez olmasina yol acardı.
+        const emplar = res.data.filter(k => k.rol === 'Employee');
         setCalisanlar(emplar);
       }).catch(() => {});
     }
@@ -138,7 +141,7 @@ function Gecmis() {
                       color: secilenDepFiltre === dep ? '#fff' : '#9ca3af',
                       border: secilenDepFiltre === dep ? '1px solid #4f46e5' : '1px solid transparent',
                     }}
-                  >{dep === 'Tümü' ? 'Tümü' : dep === 'İş Analistleri' ? 'Analist' : dep === 'Yazılımcılar' ? 'Yazılımcı' : 'QA'}</button>
+                  >{dep === 'Tümü' ? 'Tümü' : DEPARTMAN_ROZET_ADI[dep]}</button>
                 ))}
               </div>
             )}

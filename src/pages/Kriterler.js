@@ -68,7 +68,7 @@ function Kriterler() {
       setYeniAltKriter({ anaBaslikId: '', kriterAdi: '' });
       setYeniAciklamalar({ Analist: '', Yazılımcı: '', QA: '' });
       verileriGetir();
-    } catch { setHata('Hata oluştu.'); }
+    } catch (err) { setHata(err.response?.data?.mesaj || 'Hata oluştu.'); }
   };
 
   const anaBaslikDuzenle = async (e) => {
@@ -92,7 +92,7 @@ function Kriterler() {
       setAltKriterDuzenleModalAcik(false);
       setDuzenlenecekAltKriter(null);
       verileriGetir();
-    } catch { setHata('Hata oluştu.'); }
+    } catch (err) { setHata(err.response?.data?.mesaj || 'Hata oluştu.'); }
   };
 
   const silOnayla = async () => {
@@ -224,6 +224,25 @@ function Kriterler() {
             <span>{hata}</span>
           </div>
         )}
+
+        {(() => {
+          const toplamAgirlik = anaBasliklar.filter(ab => ab.aktifMi).reduce((s, ab) => s + ab.agirlikYuzdesi, 0);
+          const tamMi = toplamAgirlik === 100;
+          return (
+            <div style={{
+              ...styles.hataKutusu,
+              backgroundColor: tamMi ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)',
+              border: `1px solid ${tamMi ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.3)'}`,
+              color: tamMi ? '#34d399' : '#fbbf24',
+            }}>
+              <span style={{ flexShrink: 0, display: 'flex' }}><IconAlertTriangle /></span>
+              <span>
+                Toplam Aktif Ağırlık: <strong>%{toplamAgirlik}</strong>
+                {!tamMi && ' — bu %100 olmadığı sürece hiçbir çalışan tam puan (100) alamaz.'}
+              </span>
+            </div>
+          );
+        })()}
 
         <div style={styles.grid}>
           {anaBasliklar.map(ab => (

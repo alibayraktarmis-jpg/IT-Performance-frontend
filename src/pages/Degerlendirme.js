@@ -3,7 +3,7 @@ import Sidebar from '../components/Sidebar';
 import api from '../services/api';
 import { IconInfo } from '../components/icons';
 import FiltreButon from '../components/FiltreButon';
-import { DEPARTMANLAR } from '../constants/departmanlar';
+import { DEPARTMANLAR, DEPARTMAN_KISA_AD } from '../constants/departmanlar';
 
 const puanRenkleri = {
   1: { hex: '#f87171', rgb: '248,113,113' },
@@ -12,6 +12,10 @@ const puanRenkleri = {
   4: { hex: '#4ade80', rgb: '74,222,128' },
   5: { hex: '#10b981', rgb: '16,185,129' },
 };
+
+const puanEtiketleri = { 1: 'Yetersiz', 2: 'Gelişmeli', 3: 'Ortalama', 4: 'İyi', 5: 'Mükemmel' };
+
+const depToRol = { 'İş Analistleri': 'Analist', 'Yazılımcılar': 'Yazılımcı', 'QA/Test Uzmanları': 'QA' };
 
 function Degerlendirme() {
   const mevcutRol = localStorage.getItem('rol');
@@ -39,7 +43,11 @@ function Degerlendirme() {
   const degerlendiriciId = localStorage.getItem('id');
 
   useEffect(() => {
-    if (mevcutRol !== 'Admin') setSecilenDep(mevcutDepartman || '');
+    // Departman filtresi sadece Admin icin bir UI kolayligidir (secim cip'leri Admin'e ozel).
+    // Evaluator icin burada mevcutDepartman'a gore otomatik filtre uygulamiyoruz: backend zaten
+    // /Kullanicilar cagrisinda Evaluator'a sadece kendi ekibini donuyor, ekstra departman filtresi
+    // Evaluator'in departmani sonradan degistirilirse (eski localStorage degeri yuzunden) kendi
+    // ekibinin arama kutusunda hic gorunmemesine yol acardi.
     api.get('/Kullanicilar').then(res => {
       setCalisanlar(res.data.filter(k => k.rol === 'Employee' && k.aktifMi));
     }).catch(() => {});
@@ -170,8 +178,8 @@ const handleSubmit = async (e) => {
         setCalisanDonemler(prev => [...prev, secilenDonem]);
       }
       setHata('');
-    } catch {
-      setHata('Değerlendirme kaydedilirken hata oluştu.');
+    } catch (err) {
+      setHata(err.response?.data?.mesaj || 'Değerlendirme kaydedilirken hata oluştu.');
     }
   };
 
@@ -208,10 +216,9 @@ const handleSubmit = async (e) => {
             {mevcutRol === 'Admin' && (
               <div style={{ display: 'flex', gap: '6px' }}>
                 {DEPARTMANLAR.map(dep => {
-                  const kisaAd = { 'İş Analistleri': 'İş Analisti', 'Yazılımcılar': 'Yazılımcı', 'QA/Test Uzmanları': 'QA/Test' };
                   const aktif = secilenDep === dep;
                   return (
-                    <FiltreButon key={dep} label={kisaAd[dep]} aktif={aktif}
+                    <FiltreButon key={dep} label={DEPARTMAN_KISA_AD[dep]} aktif={aktif}
                       onClick={() => { setSecilenDep(aktif ? '' : dep); setAramaMetni(''); }} />
                   );
                 })}
@@ -383,7 +390,6 @@ const handleSubmit = async (e) => {
               <div style={styles.kriterListesi}>
                 {altKriterler.filter(ak => ak.anaBaslikId === ab.id).map(ak => {
                   const aciklamaListesi = kriterAciklamalar[ak.id] || [];
-                  const depToRol = { 'İş Analistleri': 'Analist', 'Yazılımcılar': 'Yazılımcı', 'QA/Test Uzmanları': 'QA' };
                   const rolAnahtar = depToRol[secilenCalisanRol] || secilenCalisanRol;
                   const rolAciklama = aciklamaListesi.find(a => a.rol === rolAnahtar);
                   const aciklamaMetni = rolAciklama ? rolAciklama.aciklama : null;
@@ -397,7 +403,6 @@ const handleSubmit = async (e) => {
                       </div>
                       <div style={styles.puanButonlar}>
                         {[1, 2, 3, 4, 5].map(p => {
-                          const etiketler = { 1: 'Yetersiz', 2: 'Gelişmeli', 3: 'Ortalama', 4: 'İyi', 5: 'Mükemmel' };
                           const secili = puanlar[ak.id] === p;
                           return (
                             <div key={p} style={{ position: 'relative' }}
@@ -425,7 +430,7 @@ const handleSubmit = async (e) => {
                                 whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 10,
                                 border: '1px solid #333'
                               }}>
-                                {etiketler[p]}
+                                {puanEtiketleri[p]}
                               </div>
                             </div>
                           );
