@@ -1,29 +1,25 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { IconActivity, IconMail, IconLock } from '../components/icons';
+import { IconActivity, IconMail } from '../components/icons';
 
-function Login() {
+function SifremiUnuttum() {
   const [email, setEmail] = useState('');
-  const [sifre, setSifre] = useState('');
+  const [gonderildi, setGonderildi] = useState(false);
   const [hata, setHata] = useState('');
+  const [yukleniyor, setYukleniyor] = useState(false);
 
-  const handleLogin = async (e) => {
+  const handleGonder = async (e) => {
     e.preventDefault();
+    setHata('');
+    setYukleniyor(true);
     try {
-      const response = await api.post('/Kullanicilar/login', { email, sifre });
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('rol', response.data.rol);
-      localStorage.setItem('ad', response.data.ad);
-      localStorage.setItem('soyad', response.data.soyad);
-      localStorage.setItem('id', response.data.id);
-      localStorage.setItem('departman', response.data.departman || '');
-      localStorage.setItem('email', response.data.email || '');
-      localStorage.setItem('kayitTarihi', response.data.kayitTarihi || '');
-      localStorage.setItem('sonGirisTarihi', response.data.sonGirisTarihi || '');
-      window.location.href = '/dashboard';
-    } catch (err) {
-      setHata(err.response?.data?.mesaj || 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.');
+      await api.post('/Kullanicilar/sifremi-unuttum', { email });
+      setGonderildi(true);
+    } catch {
+      setHata('İşlem sırasında bir hata oluştu. Lütfen tekrar deneyin.');
+    } finally {
+      setYukleniyor(false);
     }
   };
 
@@ -31,58 +27,50 @@ function Login() {
     <div style={styles.container}>
       <style>{`
         .login-input:focus { outline: none; border-color: #6366f1 !important; box-shadow: 0 0 0 1px #6366f1; }
-        .login-buton:hover { background-color: #4f46e5; box-shadow: 0 10px 25px rgba(99,102,241,0.25); }
-        .sifremi-unuttum-link:hover { color: #a5b4fc !important; text-decoration: underline !important; }
+        .login-buton:hover:not(:disabled) { background-color: #4f46e5; box-shadow: 0 10px 25px rgba(99,102,241,0.25); }
+        .geri-link:hover { color: #a5b4fc !important; }
       `}</style>
       <div style={styles.glow} />
       <div style={styles.card}>
         <div style={styles.baslikAlani}>
           <div style={styles.logoIkon}><IconActivity size={24} /></div>
-          <h2 style={styles.baslik}>IT Performans</h2>
-          <p style={styles.altBaslik}>Hoş geldiniz! Devam etmek için lütfen giriş yapın.</p>
+          <h2 style={styles.baslik}>Şifremi Unuttum</h2>
+          <p style={styles.altBaslik}>
+            {gonderildi
+              ? 'Eğer bu email adresi sistemde kayıtlıysa, şifre sıfırlama bağlantısı gönderildi.'
+              : 'Hesabınıza kayıtlı email adresinizi girin, size bir sıfırlama bağlantısı gönderelim.'}
+          </p>
         </div>
 
-        <form onSubmit={handleLogin}>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>E-posta Adresi</label>
-            <div style={{ position: 'relative' }}>
-              <div style={styles.inputIkon}><IconMail size={16} /></div>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="login-input"
-                style={styles.input}
-                placeholder="ornek@sirket.com"
-                required
-              />
+        {!gonderildi && (
+          <form onSubmit={handleGonder}>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>E-posta Adresi</label>
+              <div style={{ position: 'relative' }}>
+                <div style={styles.inputIkon}><IconMail size={16} /></div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="login-input"
+                  style={styles.input}
+                  placeholder="ornek@sirket.com"
+                  required
+                />
+              </div>
             </div>
-          </div>
 
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Şifre</label>
-            <div style={{ position: 'relative' }}>
-              <div style={styles.inputIkon}><IconLock size={16} /></div>
-              <input
-                type="password"
-                value={sifre}
-                onChange={(e) => setSifre(e.target.value)}
-                className="login-input"
-                style={styles.input}
-                placeholder="••••••••"
-                required
-              />
-            </div>
-          </div>
+            {hata && <div style={styles.hataKutusu}>{hata}</div>}
 
-          <div style={styles.sifremiUnuttumSatiri}>
-            <Link to="/sifremi-unuttum" className="sifremi-unuttum-link" style={styles.sifremiUnuttumLink}>Şifremi Unuttum?</Link>
-          </div>
+            <button type="submit" className="login-buton" style={styles.buton} disabled={yukleniyor}>
+              {yukleniyor ? 'Gönderiliyor...' : 'Sıfırlama Bağlantısı Gönder'}
+            </button>
+          </form>
+        )}
 
-          {hata && <div style={styles.hataKutusu}>{hata}</div>}
-
-          <button type="submit" className="login-buton" style={styles.buton}>Giriş Yap</button>
-        </form>
+        <div style={styles.geriSatiri}>
+          <Link to="/login" className="geri-link" style={styles.geriLink}>← Girişe dön</Link>
+        </div>
       </div>
     </div>
   );
@@ -142,7 +130,7 @@ const styles = {
   },
   baslik: {
     color: '#ffffff',
-    fontSize: '28px',
+    fontSize: '24px',
     fontWeight: '700',
     margin: '0 0 8px 0',
     letterSpacing: '0.5px',
@@ -151,7 +139,7 @@ const styles = {
     color: '#a0a0a0',
     fontSize: '14px',
     margin: 0,
-    lineHeight: '1.5',
+    lineHeight: '1.6',
   },
   inputGroup: {
     marginBottom: '20px',
@@ -186,17 +174,6 @@ const styles = {
     outline: 'none',
     transition: 'border-color 0.15s, box-shadow 0.15s',
   },
-  sifremiUnuttumSatiri: {
-    textAlign: 'right',
-    marginTop: '-12px',
-    marginBottom: '20px',
-  },
-  sifremiUnuttumLink: {
-    fontSize: '13px',
-    color: '#818cf8',
-    textDecoration: 'none',
-    transition: 'color 0.15s',
-  },
   hataKutusu: {
     backgroundColor: 'rgba(211, 47, 47, 0.1)',
     border: '1px solid rgba(211, 47, 47, 0.3)',
@@ -221,6 +198,16 @@ const styles = {
     letterSpacing: '0.5px',
     transition: 'all 0.15s',
   },
+  geriSatiri: {
+    textAlign: 'center',
+    marginTop: '24px',
+  },
+  geriLink: {
+    fontSize: '13px',
+    color: '#818cf8',
+    textDecoration: 'none',
+    transition: 'color 0.15s',
+  },
 };
 
-export default Login;
+export default SifremiUnuttum;

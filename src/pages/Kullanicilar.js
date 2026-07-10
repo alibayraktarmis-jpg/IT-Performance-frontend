@@ -30,6 +30,27 @@ function IslemBtn({ onClick, icon: Icon, variant = 'edit', title }) {
   );
 }
 
+const cevrimiciMi = (sonAktiflikZamani) => {
+  if (!sonAktiflikZamani) return false;
+  const farkMs = new Date() - new Date(sonAktiflikZamani);
+  return farkMs < 2 * 60 * 1000;
+};
+
+function AktiflikNoktasi({ sonAktiflikZamani, boyut = 10 }) {
+  const aktif = cevrimiciMi(sonAktiflikZamani);
+  return (
+    <span
+      title={aktif ? 'Şu an aktif' : 'Aktif değil'}
+      style={{
+        position: 'absolute', bottom: '-1px', right: '-1px',
+        width: `${boyut}px`, height: `${boyut}px`, borderRadius: '50%',
+        backgroundColor: aktif ? '#34d399' : '#4b5563',
+        border: '2px solid #242424', boxSizing: 'content-box',
+      }}
+    />
+  );
+}
+
 function SelectWrap({ children }) {
   return (
     <div style={{ position: 'relative' }}>
@@ -64,6 +85,8 @@ function Kullanicilar() {
 
   useEffect(() => {
     kullanicilariGetir();
+    const zamanlayici = setInterval(kullanicilariGetir, 30000);
+    return () => clearInterval(zamanlayici);
   }, []);
 
   const kullanicilariGetir = () => {
@@ -143,8 +166,19 @@ function Kullanicilar() {
       case 'email': return k.email || '';
       case 'departman': return k.departman || (k.rol === 'Admin' ? 'Yönetim' : '');
       case 'durum': return k.aktifMi ? 'Aktif' : 'Pasif';
+      case 'sonGiris': return k.sonGirisTarihi || '';
       default: return '';
     }
+  };
+
+  const sonGirisGoster = (tarih) => {
+    if (!tarih) return 'Hiç giriş yapmadı';
+    const simdi = new Date();
+    const giris = new Date(tarih);
+    const farkGun = Math.floor((simdi - giris) / (1000 * 60 * 60 * 24));
+    if (farkGun <= 0) return 'Bugün';
+    if (farkGun === 1) return 'Dün';
+    return `${farkGun} gün önce`;
   };
 
   const siraliBaslik = (sutun, etiket) => (
@@ -271,6 +305,7 @@ function Kullanicilar() {
                 {siraliBaslik('rol', 'Rol')}
                 {siraliBaslik('departman', 'Departman')}
                 {siraliBaslik('durum', 'Durum')}
+                {siraliBaslik('sonGiris', 'Son Giriş')}
                 <th style={styles.th}>İşlem</th>
               </tr>
             </thead>
@@ -288,7 +323,10 @@ function Kullanicilar() {
                 <tr key={k.id} className="kul-satir" style={styles.satir}>
                   <td style={styles.td}>
                     <div style={styles.isimKismi}>
-                      <div style={styles.avatar}>{k.ad?.[0]}{k.soyad?.[0]}</div>
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <div style={styles.avatar}>{k.ad?.[0]}{k.soyad?.[0]}</div>
+                        <AktiflikNoktasi sonAktiflikZamani={k.sonAktiflikZamani} />
+                      </div>
                       <span>{k.ad} {k.soyad}</span>
                     </div>
                   </td>
@@ -310,6 +348,9 @@ function Kullanicilar() {
                     }}>
                       {k.aktifMi ? 'Aktif' : 'Pasif'}
                     </span>
+                  </td>
+                  <td style={{ ...styles.td, color: k.sonGirisTarihi ? '#9ca3af' : '#6b7280', fontStyle: k.sonGirisTarihi ? 'normal' : 'italic' }}>
+                    {sonGirisGoster(k.sonGirisTarihi)}
                   </td>
                   <td style={styles.td}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -339,7 +380,10 @@ function Kullanicilar() {
               <div key={ev.id} style={styles.ekipKart}>
                 <div style={styles.ekipKartUst}>
                   <div style={styles.isimKismi}>
-                    <div style={{ ...styles.avatar, backgroundColor: '#0891b2' }}>{ev.ad?.[0]}{ev.soyad?.[0]}</div>
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <div style={{ ...styles.avatar, backgroundColor: '#0891b2' }}>{ev.ad?.[0]}{ev.soyad?.[0]}</div>
+                      <AktiflikNoktasi sonAktiflikZamani={ev.sonAktiflikZamani} />
+                    </div>
                     <div>
                       <div style={{ fontSize: '14px', fontWeight: '600', color: '#f3f4f6' }}>{ev.ad} {ev.soyad}</div>
                       <div style={{ fontSize: '12px', color: '#6b7280' }}>{ev.departman}</div>
@@ -361,7 +405,10 @@ function Kullanicilar() {
                       transition: 'opacity 0.15s, background-color 0.15s',
                     }}>
                       <div style={styles.isimKismi}>
-                        <div style={{ ...styles.avatar, width: '26px', height: '26px', fontSize: '10px' }}>{c.ad?.[0]}{c.soyad?.[0]}</div>
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <div style={{ ...styles.avatar, width: '26px', height: '26px', fontSize: '10px' }}>{c.ad?.[0]}{c.soyad?.[0]}</div>
+                          <AktiflikNoktasi sonAktiflikZamani={c.sonAktiflikZamani} boyut={8} />
+                        </div>
                         <span style={{ fontSize: '13px', color: eslesti ? '#818cf8' : (c.aktifMi ? '#d1d5db' : '#4b5563'), fontWeight: eslesti ? '700' : '400' }}>{c.ad} {c.soyad}</span>
                       </div>
                       <span style={{
@@ -406,7 +453,10 @@ function Kullanicilar() {
                       transition: 'opacity 0.15s, background-color 0.15s',
                     }}>
                       <div style={styles.isimKismi}>
-                        <div style={{ ...styles.avatar, width: '26px', height: '26px', fontSize: '10px' }}>{c.ad?.[0]}{c.soyad?.[0]}</div>
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <div style={{ ...styles.avatar, width: '26px', height: '26px', fontSize: '10px' }}>{c.ad?.[0]}{c.soyad?.[0]}</div>
+                          <AktiflikNoktasi sonAktiflikZamani={c.sonAktiflikZamani} boyut={8} />
+                        </div>
                         <span style={{ fontSize: '13px', color: eslesti ? '#818cf8' : '#d1d5db', fontWeight: eslesti ? '700' : '400' }}>{c.ad} {c.soyad}</span>
                       </div>
                       <span style={{ fontSize: '11px', color: '#6b7280' }}>{c.departman}</span>

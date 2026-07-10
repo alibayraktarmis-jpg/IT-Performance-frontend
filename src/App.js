@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
+import SifremiUnuttum from './pages/SifremiUnuttum';
+import SifreSifirla from './pages/SifreSifirla';
 import Dashboard from './pages/Dashboard';
 import Kullanicilar from './pages/Kullanicilar';
 import Kriterler from './pages/Kriterler';
@@ -18,6 +20,8 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/sifremi-unuttum" element={<SifremiUnuttum />} />
+        <Route path="/sifre-sifirla" element={<SifreSifirla />} />
         <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Navigate to="/login" />} />
         <Route path="/dashboard" element={token ? <Dashboard /> : <Navigate to="/login" />} />
         <Route path="/kullanicilar" element={!token ? <Navigate to="/login" /> : rol === 'Admin' ? <Kullanicilar /> : <Navigate to="/dashboard" />} />
