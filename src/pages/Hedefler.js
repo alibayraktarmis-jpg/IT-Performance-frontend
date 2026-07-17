@@ -2,6 +2,111 @@ import React, { useCallback, useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
 import { IconCheck, IconEdit, IconTrash, IconRotateCcw, IconClock, IconCalendar, IconAlertTriangle } from '../components/icons';
+import { Spinner, HataKutusu } from '../components/DurumGostergesi';
+import { toastGoster } from '../services/toast';
+
+const tarihInputDegeri = (d) => {
+  const ay = String(d.getMonth() + 1).padStart(2, '0');
+  const gun = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${ay}-${gun}`;
+};
+
+const hedefIkonButon = {
+  padding: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  borderRadius: '6px', border: 'none', cursor: 'pointer',
+  backgroundColor: 'transparent', color: '#9ca3af',
+  transition: 'background-color 0.15s, color 0.15s',
+};
+
+function HedefKart({ h, rol, bugun, onTamamla, onDuzenle, onSil }) {
+  const tamamlandi = h.tamamlandiMi;
+  const bitis = new Date(h.bitisTarihi);
+  const gecti = !tamamlandi && bitis < bugun;
+  const kalan = Math.ceil((bitis - bugun) / (1000 * 60 * 60 * 24));
+  const yetkili = rol === 'Admin' || rol === 'Evaluator';
+
+  const solCizgi = tamamlandi ? '#166534' : gecti ? '#ef4444' : '#4f46e5';
+
+  return (
+    <div style={{
+      position: 'relative',
+      overflow: 'hidden',
+      backgroundColor: '#121212',
+      border: '1px solid rgba(255,255,255,0.05)',
+      padding: '16px 20px 16px 24px',
+      borderRadius: '12px',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
+      height: '100%',
+      boxSizing: 'border-box',
+      gap: '12px',
+      minWidth: 0,
+    }}>
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', backgroundColor: solCizgi }} />
+      <div>
+        {yetkili && (
+          <div style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '8px' }}>
+            {h.ad} {h.soyad} · {h.departman}
+          </div>
+        )}
+        <div style={{
+          fontSize: '15px',
+          fontWeight: '500',
+          color: tamamlandi ? '#6b7280' : '#f3f4f6',
+          textDecoration: tamamlandi ? 'line-through' : 'none',
+          lineHeight: '1.6'
+        }}>
+          {h.aciklama}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: gecti ? '#fb7185' : tamamlandi ? '#34d399' : '#6b7280' }}>
+            <span style={{ color: '#94a3b8', display: 'flex' }}><IconClock /></span>
+            {tamamlandi ? 'Tamamlandı' : gecti ? `${Math.abs(kalan)} gün geçti` : kalan === 0 ? 'Bugün bitiyor' : `${kalan} gün kaldı`}
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#94a3b8' }}>
+            <span style={{ color: '#94a3b8', display: 'flex' }}><IconCalendar /></span>
+            Bitiş: {bitis.toLocaleDateString('tr-TR')}
+          </span>
+        </div>
+        {yetkili && (
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button
+              title={tamamlandi ? 'Geri Al' : 'Tamamlandı'}
+              aria-label={tamamlandi ? 'Hedefi geri al' : 'Hedefi tamamlandı olarak işaretle'}
+              className={tamamlandi ? 'hedef-geri-buton' : 'hedef-tamam-buton'}
+              onClick={() => onTamamla(h.id, tamamlandi)}
+              style={hedefIkonButon}
+            >
+              {tamamlandi ? <IconRotateCcw /> : <IconCheck />}
+            </button>
+            <button
+              title="Düzenle"
+              aria-label="Hedefi düzenle"
+              className="hedef-duzenle-buton"
+              onClick={() => onDuzenle(h)}
+              style={hedefIkonButon}
+            >
+              <IconEdit />
+            </button>
+            <button
+              title="Sil"
+              aria-label="Hedefi sil"
+              className="hedef-sil-buton"
+              onClick={() => onSil(h.id)}
+              style={hedefIkonButon}
+            >
+              <IconTrash />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Hedefler() {
   const rol = localStorage.getItem('rol');
@@ -17,6 +122,8 @@ function Hedefler() {
   const [duzenleAciklama, setDuzenleAciklama] = useState('');
   const [duzenleBitis, setDuzenleBitis] = useState('');
   const [silinecekId, setSilinecekId] = useState(null);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [getirmeHatasi, setGetirmeHatasi] = useState(null);
 
   const hedefleriGetir = useCallback(() => {
     api.get('/Hedefler').then(res => {
@@ -24,25 +131,47 @@ function Hedefler() {
     }).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    hedefleriGetir();
+  const ilkYuklemeGetir = useCallback(() => {
+    setYukleniyor(true);
+    setGetirmeHatasi(null);
+    const istekler = [api.get('/Hedefler').then(res => setHedefler(res.data))];
     if (rol === 'Admin' || rol === 'Evaluator') {
-      api.get('/Kullanicilar').then(res => {
+      istekler.push(api.get('/Kullanicilar').then(res => {
         setCalisanlar(res.data.filter(k => k.rol === 'Employee' && k.aktifMi));
-      }).catch(() => {});
+      }));
     }
-  }, [rol, hedefleriGetir]);
+    Promise.all(istekler)
+      .then(() => setYukleniyor(false))
+      .catch(() => { setGetirmeHatasi('Hedefler yüklenemedi.'); setYukleniyor(false); });
+  }, [rol]);
+
+  useEffect(() => { ilkYuklemeGetir(); }, [ilkYuklemeGetir]);
+
+  useEffect(() => {
+    const escKapat = (e) => {
+      if (e.key !== 'Escape') return;
+      setModalAcik(false);
+      setDuzenleModalAcik(false);
+      setSilinecekId(null);
+    };
+    document.addEventListener('keydown', escKapat);
+    return () => document.removeEventListener('keydown', escKapat);
+  }, []);
 
   const hedefEkle = async () => {
-    if (!secilenCalisan || !aciklama || !bitisTarihi) {
+    if (!secilenCalisan || !aciklama.trim() || !bitisTarihi) {
       setHata('Tüm alanları doldurun.');
+      return;
+    }
+    if (bitisTarihi < tarihInputDegeri(new Date())) {
+      setHata('Bitiş tarihi geçmiş bir gün olamaz.');
       return;
     }
     try {
       await api.post('/Hedefler', {
         calisanId: parseInt(secilenCalisan),
         aciklama,
-        bitisTarihi: new Date(bitisTarihi).toISOString(),
+        bitisTarihi,
         tamamlandiMi: false
       });
       setModalAcik(false);
@@ -60,33 +189,34 @@ function Hedefler() {
     const endpoint = tamamlandi ? `/Hedefler/${hedefId}/geriAl` : `/Hedefler/${hedefId}/tamamla`;
     try {
       await api.put(endpoint);
-      setHata('');
       hedefleriGetir();
     } catch (err) {
-      setHata(err.response?.data?.mesaj || 'İşlem sırasında hata oluştu.');
+      toastGoster(err.response?.data?.mesaj || 'İşlem sırasında hata oluştu.', 'hata');
     }
   };
 
   const duzenleAc = (h) => {
     setDuzenlenecekHedef(h);
     setDuzenleAciklama(h.aciklama ?? '');
-    const bitis = new Date(h.bitisTarihi);
-    setDuzenleBitis(bitis.toISOString().split('T')[0]);
+    setDuzenleBitis(tarihInputDegeri(new Date(h.bitisTarihi)));
     setDuzenleModalAcik(true);
   };
 
   const hedefGuncelle = async () => {
-    if (!duzenleAciklama || !duzenleBitis) return;
+    if (!duzenleAciklama.trim() || !duzenleBitis) {
+      toastGoster('Açıklama ve bitiş tarihi boş olamaz.', 'hata');
+      return;
+    }
     try {
       await api.put(`/Hedefler/${duzenlenecekHedef.id}`, {
         aciklama: duzenleAciklama,
-        bitisTarihi: new Date(duzenleBitis).toISOString()
+        bitisTarihi: duzenleBitis
       });
       setDuzenleModalAcik(false);
       setDuzenlenecekHedef(null);
       hedefleriGetir();
     } catch (err) {
-      setHata(err.response?.data?.mesaj || 'Güncelleme sırasında hata oluştu.');
+      toastGoster(err.response?.data?.mesaj || 'Güncelleme sırasında hata oluştu.', 'hata');
     }
   };
 
@@ -95,131 +225,17 @@ function Hedefler() {
     setSilinecekId(null);
     try {
       await api.delete(`/Hedefler/${id}`);
-      setHata('');
       hedefleriGetir();
     } catch (err) {
-      setHata(err.response?.data?.mesaj || 'Hedef silinirken hata oluştu.');
+      toastGoster(err.response?.data?.mesaj || 'Hedef silinirken hata oluştu.', 'hata');
     }
   };
 
   const bugun = new Date();
+  bugun.setHours(0, 0, 0, 0);
   const aktifHedefler = hedefler.filter(h => !h.tamamlandiMi && new Date(h.bitisTarihi) >= bugun);
   const suresiGecmis = hedefler.filter(h => !h.tamamlandiMi && new Date(h.bitisTarihi) < bugun);
   const tamamlananlar = hedefler.filter(h => h.tamamlandiMi);
-
-  const HedefKart = ({ h }) => {
-    const tamamlandi = h.tamamlandiMi;
-    const bitis = new Date(h.bitisTarihi);
-    const gecti = !tamamlandi && bitis < bugun;
-    const kalan = Math.ceil((bitis - bugun) / (1000 * 60 * 60 * 24));
-    const [hovBtn, setHovBtn] = React.useState(null);
-
-    const solCizgi = tamamlandi ? '#166534' : gecti ? '#ef4444' : '#4f46e5';
-
-    return (
-      <div style={{
-        position: 'relative',
-        overflow: 'hidden',
-        backgroundColor: '#121212',
-        border: '1px solid rgba(255,255,255,0.05)',
-        padding: '16px 20px 16px 24px',
-        borderRadius: '12px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        height: '100%',
-        boxSizing: 'border-box',
-        gap: '12px',
-        minWidth: 0,
-      }}>
-        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', backgroundColor: solCizgi }} />
-        {/* Üst: isim + hedef metni */}
-        <div>
-          {(rol === 'Admin' || rol === 'Evaluator') && (
-            <div style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '8px' }}>
-              {h.ad} {h.soyad} · {h.departman}
-            </div>
-          )}
-          <div style={{
-            fontSize: '15px',
-            fontWeight: '500',
-            color: tamamlandi ? '#6b7280' : '#f3f4f6',
-            textDecoration: tamamlandi ? 'line-through' : 'none',
-            lineHeight: '1.6'
-          }}>
-            {h.aciklama}
-          </div>
-        </div>
-
-        {/* Alt: tarih bilgisi + butonlar aynı hizada */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: gecti ? '#fb7185' : tamamlandi ? '#34d399' : '#6b7280' }}>
-              <span style={{ color: '#94a3b8', display: 'flex' }}><IconClock /></span>
-              {tamamlandi ? 'Tamamlandı' : gecti ? `${Math.abs(kalan)} gün geçti` : kalan === 0 ? 'Bugün bitiyor' : `${kalan} gün kaldı`}
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#4b5563' }}>
-              <span style={{ color: '#94a3b8', display: 'flex' }}><IconCalendar /></span>
-              Bitiş: {bitis.toLocaleDateString('tr-TR')}
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-            {(rol === 'Admin' || rol === 'Evaluator') && (
-              <button
-                title={tamamlandi ? 'Geri Al' : 'Tamamlandı'}
-                onClick={() => tamamla(h.id, tamamlandi)}
-                onMouseEnter={() => setHovBtn('tamam')}
-                onMouseLeave={() => setHovBtn(null)}
-                style={{
-                  padding: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: '6px', border: 'none', cursor: 'pointer',
-                  backgroundColor: hovBtn === 'tamam' ? (tamamlandi ? 'rgba(255,255,255,0.08)' : 'rgba(16,185,129,0.1)') : 'transparent',
-                  color: hovBtn === 'tamam' ? (tamamlandi ? '#d1d5db' : '#34d399') : '#9ca3af',
-                  transition: 'background-color 0.15s, color 0.15s',
-                }}
-              >
-                {tamamlandi ? <IconRotateCcw /> : <IconCheck />}
-              </button>
-            )}
-            {(rol === 'Admin' || rol === 'Evaluator') && (
-              <>
-                <button
-                  title="Düzenle"
-                  onClick={() => duzenleAc(h)}
-                  onMouseEnter={() => setHovBtn('duzenle')}
-                  onMouseLeave={() => setHovBtn(null)}
-                  style={{
-                    padding: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    borderRadius: '6px', border: 'none', cursor: 'pointer',
-                    backgroundColor: hovBtn === 'duzenle' ? 'rgba(59,130,246,0.1)' : 'transparent',
-                    color: hovBtn === 'duzenle' ? '#60a5fa' : '#9ca3af',
-                    transition: 'background-color 0.15s, color 0.15s',
-                  }}
-                >
-                  <IconEdit />
-                </button>
-                <button
-                  title="Sil"
-                  onClick={() => setSilinecekId(h.id)}
-                  onMouseEnter={() => setHovBtn('sil')}
-                  onMouseLeave={() => setHovBtn(null)}
-                  style={{
-                    padding: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    borderRadius: '6px', border: 'none', cursor: 'pointer',
-                    backgroundColor: hovBtn === 'sil' ? 'rgba(239,68,68,0.12)' : 'transparent',
-                    color: hovBtn === 'sil' ? '#ef4444' : '#9ca3af',
-                    transition: 'background-color 0.15s, color 0.15s',
-                  }}
-                >
-                  <IconTrash />
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div style={styles.sayfa}>
@@ -231,10 +247,20 @@ function Hedefler() {
         .sil-modal-sil:hover {
           background-color: #e11d48 !important;
         }
+        .hedef-tamam-buton:hover { color: #34d399 !important; background-color: rgba(16,185,129,0.1) !important; }
+        .hedef-geri-buton:hover { color: #d1d5db !important; background-color: rgba(255,255,255,0.08) !important; }
+        .hedef-duzenle-buton:hover { color: #60a5fa !important; background-color: rgba(59,130,246,0.1) !important; }
+        .hedef-sil-buton:hover { color: #ef4444 !important; background-color: rgba(239,68,68,0.12) !important; }
+        @media (max-width: 768px) {
+          .icerik-responsive { margin-left: 0 !important; margin-top: 56px !important; padding: 20px 16px !important; min-width: 0 !important; }
+          .hedef-topbar-responsive { flex-wrap: wrap; gap: 12px; }
+          .hedef-kart-grid-responsive { grid-template-columns: 1fr !important; }
+          .hedef-kart-grid-responsive > * { min-width: 0 !important; }
+        }
       `}</style>
       <Sidebar />
-      <div style={styles.icerik}>
-        <div style={styles.topBar}>
+      <div className="icerik-responsive" style={styles.icerik}>
+        <div className="hedef-topbar-responsive" style={styles.topBar}>
           <div>
             <h2 style={styles.baslik}>Hedefler</h2>
             <p style={styles.altBaslik}>{rol === 'Employee' ? 'Hedeflerinizi takip edin ve tamamlayın' : 'Çalışan hedeflerini atayın ve takip edin'}</p>
@@ -244,8 +270,12 @@ function Hedefler() {
           )}
         </div>
 
-        {hata && <div style={styles.hataKutu}>{hata}</div>}
-
+        {yukleniyor ? (
+          <Spinner />
+        ) : getirmeHatasi ? (
+          <HataKutusu mesaj={getirmeHatasi} onTekrarDene={ilkYuklemeGetir} />
+        ) : (
+        <>
         <div style={styles.bolum}>
           <div style={styles.bolumBaslik}>
             Aktif Hedefler
@@ -253,8 +283,8 @@ function Hedefler() {
           </div>
           {aktifHedefler.length === 0
             ? <div style={styles.bos}>Aktif hedef bulunmuyor.</div>
-            : <div style={styles.kartGrid}>
-                {aktifHedefler.map((h, i) => <HedefKart key={i} h={h} />)}
+            : <div className="hedef-kart-grid-responsive" style={styles.kartGrid}>
+                {aktifHedefler.map(h => <HedefKart key={h.id} h={h} rol={rol} bugun={bugun} onTamamla={tamamla} onDuzenle={duzenleAc} onSil={setSilinecekId} />)}
               </div>
           }
         </div>
@@ -265,8 +295,8 @@ function Hedefler() {
               Süresi Geçmiş
               <span style={{ ...styles.sayi, backgroundColor: '#7f1d1d', color: '#f87171' }}>{suresiGecmis.length}</span>
             </div>
-            <div style={styles.kartGrid}>
-              {suresiGecmis.map((h, i) => <HedefKart key={i} h={h} />)}
+            <div className="hedef-kart-grid-responsive" style={styles.kartGrid}>
+              {suresiGecmis.map(h => <HedefKart key={h.id} h={h} rol={rol} bugun={bugun} onTamamla={tamamla} onDuzenle={duzenleAc} onSil={setSilinecekId} />)}
             </div>
           </div>
         )}
@@ -277,28 +307,31 @@ function Hedefler() {
               Tamamlananlar
               <span style={{ ...styles.sayi, backgroundColor: '#166534', color: '#4ade80' }}>{tamamlananlar.length}</span>
             </div>
-            <div style={styles.kartGrid}>
-              {tamamlananlar.map((h, i) => <HedefKart key={i} h={h} />)}
+            <div className="hedef-kart-grid-responsive" style={styles.kartGrid}>
+              {tamamlananlar.map(h => <HedefKart key={h.id} h={h} rol={rol} bugun={bugun} onTamamla={tamamla} onDuzenle={duzenleAc} onSil={setSilinecekId} />)}
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
 
       {duzenleModalAcik && (
         <div style={styles.modalArka} onClick={() => setDuzenleModalAcik(false)}>
-          <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <div style={styles.modalBaslik}>Hedef Düzenle</div>
+          <div role="dialog" aria-modal="true" aria-labelledby="hedef-duzenle-modal" style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div id="hedef-duzenle-modal" style={styles.modalBaslik}>Hedef Düzenle</div>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Hedef Açıklaması</label>
+              <label htmlFor="duzenle-hedef-aciklama" style={styles.label}>Hedef Açıklaması</label>
               <textarea
+                id="duzenle-hedef-aciklama"
                 style={{ ...styles.input, resize: 'vertical', minHeight: '80px', lineHeight: '1.5' }}
                 value={duzenleAciklama}
                 onChange={e => setDuzenleAciklama(e.target.value)}
               />
             </div>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Bitiş Tarihi</label>
-              <input type="date" style={styles.input} value={duzenleBitis} onChange={e => setDuzenleBitis(e.target.value)} />
+              <label htmlFor="duzenle-hedef-bitis" style={styles.label}>Bitiş Tarihi</label>
+              <input id="duzenle-hedef-bitis" type="date" style={styles.input} value={duzenleBitis} onChange={e => setDuzenleBitis(e.target.value)} />
             </div>
             <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
               <button onClick={hedefGuncelle} style={styles.kaydetButon}>Güncelle</button>
@@ -310,12 +343,12 @@ function Hedefler() {
 
       {modalAcik && (
         <div style={styles.modalArka} onClick={() => setModalAcik(false)}>
-          <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <div style={styles.modalBaslik}>Yeni Hedef Ekle</div>
+          <div role="dialog" aria-modal="true" aria-labelledby="hedef-ekle-modal" style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div id="hedef-ekle-modal" style={styles.modalBaslik}>Yeni Hedef Ekle</div>
             {hata && <div style={styles.hataKutu}>{hata}</div>}
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Çalışan</label>
-              <select style={styles.input} value={secilenCalisan} onChange={e => setSecilenCalisan(e.target.value)}>
+              <label htmlFor="hedef-calisan" style={styles.label}>Çalışan</label>
+              <select id="hedef-calisan" style={styles.input} value={secilenCalisan} onChange={e => setSecilenCalisan(e.target.value)}>
                 <option value="">Seçin...</option>
                 {calisanlar.map(c => (
                   <option key={c.id} value={c.id}>{c.ad} {c.soyad} — {c.departman}</option>
@@ -323,8 +356,9 @@ function Hedefler() {
               </select>
             </div>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Hedef Açıklaması</label>
+              <label htmlFor="hedef-aciklama" style={styles.label}>Hedef Açıklaması</label>
               <textarea
+                id="hedef-aciklama"
                 style={{ ...styles.input, resize: 'vertical', minHeight: '80px', lineHeight: '1.5' }}
                 placeholder="Hedefi açıklayın..."
                 value={aciklama}
@@ -332,11 +366,13 @@ function Hedefler() {
               />
             </div>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Bitiş Tarihi</label>
+              <label htmlFor="hedef-bitis" style={styles.label}>Bitiş Tarihi</label>
               <input
+                id="hedef-bitis"
                 type="date"
                 style={styles.input}
                 value={bitisTarihi}
+                min={tarihInputDegeri(new Date())}
                 onChange={e => setBitisTarihi(e.target.value)}
               />
             </div>
@@ -350,9 +386,9 @@ function Hedefler() {
 
       {silinecekId && (
         <div style={styles.silModalArka} onClick={() => setSilinecekId(null)}>
-          <div style={styles.silModal} onClick={e => e.stopPropagation()}>
+          <div role="alertdialog" aria-modal="true" aria-labelledby="hedef-sil-modal" style={styles.silModal} onClick={e => e.stopPropagation()}>
             <div style={styles.silIkonKapsayici}><IconAlertTriangle size={24} /></div>
-            <h3 style={styles.silBaslik}>Hedefi Sil</h3>
+            <h3 id="hedef-sil-modal" style={styles.silBaslik}>Hedefi Sil</h3>
             <p style={styles.silAciklama}>Bu hedefi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.</p>
             <div style={styles.silButonlar}>
               <button type="button" className="sil-modal-iptal" onClick={() => setSilinecekId(null)} style={styles.silIptalButon}>İptal</button>
@@ -378,7 +414,7 @@ const styles = {
   sayi: { fontSize: '12px', backgroundColor: '#2a2a2a', color: '#a0a0a0', padding: '2px 8px', borderRadius: '12px', fontWeight: '500' },
   bos: { fontSize: '14px', color: '#a0a0a0' },
   modalArka: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
-  modal: { backgroundColor: '#242424', borderRadius: '10px', padding: '28px', width: '460px', border: '1px solid #333' },
+  modal: { backgroundColor: '#242424', borderRadius: '10px', padding: '28px', width: '460px', maxWidth: '92vw', boxSizing: 'border-box', border: '1px solid #333' },
   modalBaslik: { fontSize: '17px', fontWeight: '600', color: '#fff', marginBottom: '20px' },
   hataKutu: { backgroundColor: 'rgba(69,10,10,0.3)', border: '1px solid #991b1b', color: '#f87171', padding: '10px', borderRadius: '6px', marginBottom: '14px', fontSize: '13px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' },

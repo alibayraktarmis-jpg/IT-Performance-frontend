@@ -11,6 +11,7 @@ import Raporlar from './pages/Raporlar';
 import Hedefler from './pages/Hedefler';
 import Gecmis from './pages/Gecmis';
 import Profil from './pages/Profil';
+import ToastContainer from './components/ToastContainer';
 
 function App() {
   const token = localStorage.getItem('token');
@@ -18,6 +19,7 @@ function App() {
 
   return (
     <Router>
+      <ToastContainer />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/sifremi-unuttum" element={<SifremiUnuttum />} />

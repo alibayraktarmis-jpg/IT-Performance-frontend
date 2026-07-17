@@ -3,6 +3,8 @@ import Sidebar from '../components/Sidebar';
 import api from '../services/api';
 import { IconEdit, IconPower, IconTrash, IconPlus, IconAlertTriangle } from '../components/icons';
 import { DEPARTMANLAR } from '../constants/departmanlar';
+import { Spinner, HataKutusu } from '../components/DurumGostergesi';
+import { toastGoster } from '../services/toast';
 
 function IslemBtn({ onClick, icon: Icon, variant = 'edit', title }) {
   const [hov, setHov] = React.useState(false);
@@ -73,8 +75,6 @@ function Kullanicilar() {
     ad: '', soyad: '', email: '', sifre: '', rol: 'Employee', departman: '', evaluatorId: null
   });
   const evaluatorlar = kullanicilar.filter(k => k.rol === 'Evaluator' && k.aktifMi);
-  const [hata, setHata] = useState('');
-  const [basari, setBasari] = useState('');
   const [aramaMetni, setAramaMetni] = useState('');
   const [duzenleModalAcik, setDuzenleModalAcik] = useState(false);
   const [duzenlenecek, setDuzenlenecek] = useState(null);
@@ -82,31 +82,32 @@ function Kullanicilar() {
   const [siralamaSutun, setSiralamaSutun] = useState(null);
   const [siralamaYon, setSiralamaYon] = useState('asc');
   const [gorunum, setGorunum] = useState('liste');
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [getirmeHatasi, setGetirmeHatasi] = useState(null);
 
   useEffect(() => {
-    kullanicilariGetir();
-    const zamanlayici = setInterval(kullanicilariGetir, 30000);
+    kullanicilariGetir(true);
+    const zamanlayici = setInterval(() => kullanicilariGetir(false), 30000);
     return () => clearInterval(zamanlayici);
   }, []);
 
-  const kullanicilariGetir = () => {
+  const kullanicilariGetir = (ilkYukleme) => {
+    if (ilkYukleme) { setYukleniyor(true); setGetirmeHatasi(null); }
     api.get('/Kullanicilar')
-      .then(res => setKullanicilar(res.data))
-      .catch(() => {});
+      .then(res => { setKullanicilar(res.data); if (ilkYukleme) setYukleniyor(false); })
+      .catch(() => { if (ilkYukleme) { setGetirmeHatasi('Kullanıcılar yüklenemedi.'); setYukleniyor(false); } });
   };
 
   const kullaniciEkle = async (e) => {
     e.preventDefault();
     try {
       await api.post('/Kullanicilar', yeniKullanici);
-      setBasari('Kullanıcı başarıyla eklendi.');
-      setHata('');
+      toastGoster('Kullanıcı başarıyla eklendi.', 'basari');
       setModalAcik(false);
       setYeniKullanici({ ad: '', soyad: '', email: '', sifre: '', rol: 'Employee', departman: '', evaluatorId: null });
       kullanicilariGetir();
     } catch (err) {
-      setHata(err.response?.data?.mesaj || 'Kullanıcı eklenirken hata oluştu.');
-      setBasari('');
+      toastGoster(err.response?.data?.mesaj || 'Kullanıcı eklenirken hata oluştu.', 'hata');
     }
   };
 
@@ -115,10 +116,9 @@ function Kullanicilar() {
       await api.patch(`/Kullanicilar/${id}/aktif`, !aktifMi, {
         headers: { 'Content-Type': 'application/json' }
       });
-      setHata('');
       kullanicilariGetir();
     } catch (err) {
-      setHata(err.response?.data?.mesaj || 'İşlem sırasında hata oluştu.');
+      toastGoster(err.response?.data?.mesaj || 'İşlem sırasında hata oluştu.', 'hata');
     }
   };
 
@@ -126,14 +126,12 @@ function Kullanicilar() {
     e.preventDefault();
     try {
       await api.put(`/Kullanicilar/${duzenlenecek.id}`, duzenlenecek);
-      setBasari('Kullanıcı başarıyla güncellendi.');
-      setHata('');
+      toastGoster('Kullanıcı başarıyla güncellendi.', 'basari');
       setDuzenleModalAcik(false);
       setDuzenlenecek(null);
       kullanicilariGetir();
     } catch (err) {
-      setHata(err.response?.data?.mesaj || 'Güncelleme sırasında hata oluştu.');
-      setBasari('');
+      toastGoster(err.response?.data?.mesaj || 'Güncelleme sırasında hata oluştu.', 'hata');
     }
   };
 
@@ -142,10 +140,9 @@ function Kullanicilar() {
     setSilinecekId(null);
     try {
       await api.delete(`/Kullanicilar/${id}`);
-      setHata('');
       kullanicilariGetir();
     } catch (err) {
-      setHata(err.response?.data?.mesaj || 'Kullanıcı silinirken hata oluştu.');
+      toastGoster(err.response?.data?.mesaj || 'Kullanıcı silinirken hata oluştu.', 'hata');
     }
   };
 
@@ -232,10 +229,16 @@ function Kullanicilar() {
         .kul-satir:hover {
           background-color: rgba(255,255,255,0.05);
         }
+        @media (max-width: 768px) {
+          .icerik-responsive { margin-left: 0 !important; margin-top: 56px !important; padding: 20px 16px !important; min-width: 0 !important; }
+          .kul-topbar-responsive { flex-wrap: wrap; gap: 12px; }
+          .kul-arac-cubugu-responsive { flex-wrap: wrap; }
+          .kul-form-grid-responsive { grid-template-columns: 1fr !important; }
+        }
       `}</style>
       <Sidebar />
-      <div style={styles.icerik}>
-        <div style={styles.topBar}>
+      <div className="icerik-responsive" style={styles.icerik}>
+        <div className="kul-topbar-responsive" style={styles.topBar}>
           <div>
             <h2 style={styles.baslik}>Kullanıcılar</h2>
             <p style={styles.altBaslik}>Sistemdeki tüm kullanıcıları yönetin</p>
@@ -258,13 +261,15 @@ function Kullanicilar() {
           </div>
         </div>
 
-        {basari && <div style={styles.basariKutusu}>{basari}</div>}
-        {hata && <div style={styles.hataKutusu}>{hata}</div>}
-
-        {/* Arama + Eylem Satırı */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '16px' }}>
+        {yukleniyor ? (
+          <Spinner />
+        ) : getirmeHatasi ? (
+          <HataKutusu mesaj={getirmeHatasi} onTekrarDene={() => kullanicilariGetir(true)} />
+        ) : (
+        <>
+        <div className="kul-arac-cubugu-responsive" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ position: 'relative', width: '288px' }}>
+            <div style={{ position: 'relative', width: '288px', maxWidth: '100%' }}>
               <svg
                 style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6b7280' }}
                 width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
@@ -469,13 +474,15 @@ function Kullanicilar() {
           })()}
         </div>
         )}
+        </>
+        )}
 
         {duzenleModalAcik && duzenlenecek && (
           <div style={styles.modalArkaplan}>
             <div style={styles.modal}>
               <h3 style={styles.modalBaslik}>Kullanıcı Düzenle</h3>
               <form onSubmit={kullaniciGuncelle}>
-                <div style={styles.formGrid}>
+                <div className="kul-form-grid-responsive" style={styles.formGrid}>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Ad</label>
                     <input className="kul-input" style={styles.input} value={duzenlenecek.ad || ''}
@@ -555,7 +562,7 @@ function Kullanicilar() {
             <div style={styles.modal}>
               <h3 style={styles.modalBaslik}>Yeni Kullanıcı Ekle</h3>
               <form onSubmit={kullaniciEkle}>
-                <div style={styles.formGrid}>
+                <div className="kul-form-grid-responsive" style={styles.formGrid}>
                   <div style={styles.inputGroup}>
                     <label style={styles.label}>Ad</label>
                     <input style={styles.input} value={yeniKullanici.ad}
@@ -673,9 +680,7 @@ const styles = {
   ekipListesi: { display: 'flex', flexDirection: 'column', gap: '10px' },
   ekipSatir: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   ekipBosMetin: { fontSize: '13px', color: '#4b5563', fontStyle: 'italic' },
-  basariKutusu: { backgroundColor: 'rgba(20,83,45,0.3)', border: '1px solid #166534', color: '#4ade80', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
-  hataKutusu: { backgroundColor: 'rgba(69,10,10,0.3)', border: '1px solid #991b1b', color: '#f87171', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
-  tablo: { backgroundColor: '#242424', borderRadius: '8px', padding: '24px' },
+  tablo: { backgroundColor: '#242424', borderRadius: '8px', padding: '24px', overflowX: 'auto' },
   tabloEl: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', padding: '12px 16px', fontSize: '12px', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #333', fontWeight: '600' },
   td: { padding: '14px 16px', fontSize: '14px', color: '#e0e0e0', borderBottom: '1px solid #2a2a2a' },
@@ -685,7 +690,7 @@ const styles = {
   rolBadge: { padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', color: '#fff' },
   durumBadge: { padding: '3px 10px', borderRadius: '9999px', fontSize: '12px', fontWeight: '600' },
   modalArkaplan: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
-  modal: { backgroundColor: '#242424', borderRadius: '12px', padding: '32px', width: '500px', border: '1px solid #333' },
+  modal: { backgroundColor: '#242424', borderRadius: '12px', padding: '32px', width: '500px', maxWidth: '92vw', boxSizing: 'border-box', border: '1px solid #333' },
   modalBaslik: { fontSize: '18px', fontWeight: '600', color: '#fff', margin: '0 0 24px' },
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },

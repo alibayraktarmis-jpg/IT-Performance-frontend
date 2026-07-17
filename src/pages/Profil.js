@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
-import { IconMail, IconShield, IconLock, IconCalendar, IconClock } from '../components/icons';
+import { IconMail, IconShield, IconLock, IconCalendar, IconClock, IconBarChart } from '../components/icons';
+import { toastGoster } from '../services/toast';
+
+const skorRenk = (skor) => skor == null ? '#94a3b8' : skor >= 80 ? '#34d399' : skor >= 60 ? '#fbbf24' : '#fb7185';
 
 const tarihFormatla = (isoStr) => {
   if (!isoStr) return null;
@@ -27,38 +30,54 @@ function Profil() {
   const email = localStorage.getItem('email');
   const kayitTarihi = localStorage.getItem('kayitTarihi');
   const sonGirisTarihi = localStorage.getItem('sonGirisTarihi');
+  const id = localStorage.getItem('id');
   const rolRenk = ROL_RENKLERI[rol] || ROL_RENKLERI.Employee;
+
+  const [degerlendirmeler, setDegerlendirmeler] = useState([]);
+
+  useEffect(() => {
+    if (rol !== 'Employee' || !id) return;
+    api.get(`/Degerlendirmeler/calisan/${id}`).then(res => setDegerlendirmeler(res.data || [])).catch(() => {});
+  }, [rol, id]);
+
+  const ortalamaHesapla = (liste) => {
+    const skorlar = liste.map(d => d.toplamSkor).filter(s => s != null).map(Number);
+    return skorlar.length > 0
+      ? parseFloat((skorlar.reduce((a, b) => a + b, 0) / skorlar.length).toFixed(1))
+      : null;
+  };
+
+  const buYil = new Date().getFullYear().toString();
+  const buYilDegerlendirmeler = degerlendirmeler.filter(d => d.donem?.startsWith(buYil));
+  const buYilOrtalama = ortalamaHesapla(buYilDegerlendirmeler);
+  const genelOrtalama = ortalamaHesapla(degerlendirmeler);
 
   const [mevcutSifre, setMevcutSifre] = useState('');
   const [yeniSifre, setYeniSifre] = useState('');
   const [yeniSifreTekrar, setYeniSifreTekrar] = useState('');
-  const [hata, setHata] = useState('');
-  const [basari, setBasari] = useState('');
   const [yukleniyor, setYukleniyor] = useState(false);
 
   const sifreDegistir = async (e) => {
     e.preventDefault();
-    setHata('');
-    setBasari('');
 
     if (yeniSifre !== yeniSifreTekrar) {
-      setHata('Yeni şifreler eşleşmiyor.');
+      toastGoster('Yeni şifreler eşleşmiyor.', 'hata');
       return;
     }
     if (yeniSifre.length < 6) {
-      setHata('Yeni şifre en az 6 karakter olmalıdır.');
+      toastGoster('Yeni şifre en az 6 karakter olmalıdır.', 'hata');
       return;
     }
 
     setYukleniyor(true);
     try {
       await api.put('/Kullanicilar/sifre-degistir', { mevcutSifre, yeniSifre });
-      setBasari('Şifreniz başarıyla değiştirildi.');
+      toastGoster('Şifreniz başarıyla değiştirildi.', 'basari');
       setMevcutSifre('');
       setYeniSifre('');
       setYeniSifreTekrar('');
     } catch (err) {
-      setHata(err.response?.data?.mesaj || 'Şifre değiştirilirken hata oluştu.');
+      toastGoster(err.response?.data?.mesaj || 'Şifre değiştirilirken hata oluştu.', 'hata');
     } finally {
       setYukleniyor(false);
     }
@@ -114,14 +133,34 @@ function Profil() {
             </div>
           </div>
 
+          {rol === 'Employee' && (
+            <div style={{ ...styles.kart, maxWidth: '520px' }}>
+              <div style={styles.kartBaslikIkonlu}>
+                <span style={styles.kartBaslikIkon}><IconBarChart size={16} /></span>
+                Performans Özetim
+              </div>
+              <div style={styles.istatistikGrid}>
+                <div style={styles.istatistikKutu}>
+                  <div style={styles.istatistikDeger}>{degerlendirmeler.length}</div>
+                  <div style={styles.istatistikEtiket}>Toplam Değerlendirme</div>
+                </div>
+                <div style={styles.istatistikKutu}>
+                  <div style={{ ...styles.istatistikDeger, color: skorRenk(buYilOrtalama) }}>{buYilOrtalama ?? '-'}</div>
+                  <div style={styles.istatistikEtiket}>{buYil} Ortalaması</div>
+                </div>
+                <div style={styles.istatistikKutu}>
+                  <div style={{ ...styles.istatistikDeger, color: skorRenk(genelOrtalama) }}>{genelOrtalama ?? '-'}</div>
+                  <div style={styles.istatistikEtiket}>Tüm Zamanlar Ortalaması</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div style={styles.kart}>
             <div style={styles.kartBaslikIkonlu}>
               <span style={styles.kartBaslikIkon}><IconShield size={16} /></span>
               Şifre Değiştir
             </div>
-
-            {hata && <div style={styles.hataKutu}>{hata}</div>}
-            {basari && <div style={styles.basariKutu}>{basari}</div>}
 
             <form onSubmit={sifreDegistir}>
               <div style={styles.inputGroup}>
@@ -179,6 +218,11 @@ const styles = {
   kartBaslikIkonlu: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', fontWeight: '600', color: '#fff', marginBottom: '18px' },
   kartBaslikIkon: { display: 'flex', alignItems: 'center', color: '#818cf8' },
 
+  istatistikGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' },
+  istatistikKutu: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '16px 8px', textAlign: 'center' },
+  istatistikDeger: { fontSize: '24px', fontWeight: '700', color: '#fff', marginBottom: '4px' },
+  istatistikEtiket: { fontSize: '11px', color: '#94a3b8', lineHeight: '1.3' },
+
   profilHeader: { display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', paddingBottom: '20px', marginBottom: '4px' },
   buyukAvatar: {
     width: '80px', height: '80px', borderRadius: '50%',
@@ -198,8 +242,6 @@ const styles = {
   bilgiIkon: { display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', flexShrink: 0 },
   bilgiDeger: { fontSize: '13px', color: '#94a3b8' },
 
-  hataKutu: { backgroundColor: 'rgba(69,10,10,0.3)', border: '1px solid #991b1b', color: '#f87171', padding: '10px', borderRadius: '6px', marginBottom: '14px', fontSize: '13px' },
-  basariKutu: { backgroundColor: 'rgba(20,83,45,0.3)', border: '1px solid #166534', color: '#4ade80', padding: '10px', borderRadius: '6px', marginBottom: '14px', fontSize: '13px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' },
   label: { fontSize: '13px', color: '#b3b3b3', fontWeight: '500' },
   inputIkon: {

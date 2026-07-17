@@ -1,33 +1,132 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
 import { DEPARTMANLAR, DEPARTMAN_ROZET_ADI } from '../constants/departmanlar';
+import { Spinner, HataKutusu } from '../components/DurumGostergesi';
+
+const skorRenk = (skor) => skor >= 80 ? '#34d399' : skor >= 60 ? '#fbbf24' : '#fb7185';
+
+// Donem satirina tiklaninca alt kriter bazli puan kirilimini acar/kapatir.
+function GecmisTablosu({ degerlendirmeler, calisanId }) {
+  const [acikId, setAcikId] = useState(null);
+  const [kirilimlar, setKirilimlar] = useState({});
+  const [yukleniyorId, setYukleniyorId] = useState(null);
+
+  const satiraTikla = (d) => {
+    if (acikId === d.id) { setAcikId(null); return; }
+    setAcikId(d.id);
+    if (!kirilimlar[d.id]) {
+      setYukleniyorId(d.id);
+      api.get(`/Degerlendirmeler/calisan/${calisanId}/donem`, { params: { donem: d.donem } })
+        .then(res => {
+          setKirilimlar(prev => ({ ...prev, [d.id]: res.data?.detaylar || [] }));
+        })
+        .catch(() => setKirilimlar(prev => ({ ...prev, [d.id]: [] })))
+        .finally(() => setYukleniyorId(null));
+    }
+  };
+
+  if (degerlendirmeler.length === 0) {
+    return <div style={styles.bos}>Henüz değerlendirme kaydı bulunmuyor.</div>;
+  }
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+    <table style={styles.tablo}>
+      <thead>
+        <tr>
+          <th style={{ ...styles.th, width: '32px' }} />
+          <th style={styles.th}>Dönem</th>
+          <th style={styles.th}>Tarih</th>
+          <th style={styles.th}>Toplam Skor</th>
+          <th style={styles.th}>Yorum</th>
+        </tr>
+      </thead>
+      <tbody>
+        {degerlendirmeler.map(d => {
+          const skor = d.toplamSkor;
+          const acik = acikId === d.id;
+          const kirilim = kirilimlar[d.id];
+          const gruplar = {};
+          (kirilim || []).forEach(k => {
+            (gruplar[k.anaBaslikAdi] = gruplar[k.anaBaslikAdi] || []).push(k);
+          });
+          return (
+            <React.Fragment key={d.id}>
+              <tr
+                style={{ ...styles.satir, cursor: 'pointer' }}
+                onClick={() => satiraTikla(d)}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <td style={{ ...styles.td, textAlign: 'center', color: '#6b7280' }}>{acik ? '▾' : '▸'}</td>
+                <td style={styles.td}><span style={styles.donemBadge}>{d.donem}</span></td>
+                <td style={styles.td}>{d.tarih && !d.tarih.startsWith('0001') ? new Date(d.tarih).toLocaleDateString('tr-TR') : '-'}</td>
+                <td style={styles.td}><span style={{ fontWeight: '700', fontSize: '15px', color: skorRenk(skor) }}>{skor != null ? parseFloat(skor).toFixed(1) : '-'}</span></td>
+                <td style={{ ...styles.td, color: '#a0a0a0', fontSize: '13px' }}>{d.yorum || '-'}</td>
+              </tr>
+              {acik && (
+                <tr>
+                  <td colSpan={5} style={{ padding: 0, borderBottom: '1px solid #2a2a2a', backgroundColor: 'rgba(0,0,0,0.15)' }}>
+                    <div style={{ padding: '16px 16px 16px 44px' }}>
+                      {yukleniyorId === d.id ? (
+                        <div style={{ color: '#9ca3af', fontSize: '13px' }}>Yükleniyor...</div>
+                      ) : !kirilim || kirilim.length === 0 ? (
+                        <div style={{ color: '#9ca3af', fontSize: '13px' }}>Kriter detayı bulunamadı.</div>
+                      ) : (
+                        Object.entries(gruplar).map(([anaBaslik, kriterler]) => (
+                          <div key={anaBaslik} style={{ marginBottom: '12px' }}>
+                            <div style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>{anaBaslik}</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              {kriterler.map(k => (
+                                <div key={k.id} style={{ display: 'flex', justifyContent: 'space-between', maxWidth: '360px' }}>
+                                  <span style={{ fontSize: '13px', color: '#e0e0e0' }}>{k.kriterAdi}</span>
+                                  <span style={{ fontSize: '13px', fontWeight: '600', color: skorRenk(k.puan * 20) }}>{k.puan} / 5</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </tbody>
+    </table>
+    </div>
+  );
+}
 
 function Gecmis() {
   const rol = localStorage.getItem('rol');
   const kullaniciId = localStorage.getItem('id');
-  const kullaniciDepartman = localStorage.getItem('departman');
   const [calisanlar, setCalisanlar] = useState([]);
   const [secilenCalisan, setSecilenCalisan] = useState(null);
   const [degerlendirmeler, setDegerlendirmeler] = useState([]);
   const [arama, setArama] = useState('');
   const [secilenDepFiltre, setSecilenDepFiltre] = useState('Tümü');
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [hata, setHata] = useState(null);
 
-  useEffect(() => {
-    if (rol === 'Employee') {
-      api.get(`/Degerlendirmeler/calisan/${kullaniciId}`).then(res => {
-        setDegerlendirmeler(res.data);
-      }).catch(() => {});
-    } else {
-      api.get('/Kullanicilar').then(res => {
-        // Backend zaten role gore kapsamı sınırlıyor (Evaluator sadece kendi ekibini, Admin herkesi alır);
-        // burada departmana gore ek bir filtre uygulamak, Evaluator'ın kendi departmanı sonradan
-        // degistirilirse (localStorage'daki eski deger yuzunden) kendi ekibinin gorunmez olmasina yol acardı.
-        const emplar = res.data.filter(k => k.rol === 'Employee');
-        setCalisanlar(emplar);
-      }).catch(() => {});
-    }
-  }, [rol, kullaniciId, kullaniciDepartman]);
+  const ilkYuklemeGetir = useCallback(() => {
+    setYukleniyor(true);
+    setHata(null);
+    const istek = rol === 'Employee'
+      ? api.get(`/Degerlendirmeler/calisan/${kullaniciId}`).then(res => setDegerlendirmeler(res.data))
+      : api.get('/Kullanicilar').then(res => {
+          const emplar = res.data.filter(k => k.rol === 'Employee');
+          setCalisanlar(emplar);
+        });
+    istek
+      .then(() => setYukleniyor(false))
+      .catch(() => { setHata('Veriler yüklenemedi.'); setYukleniyor(false); });
+  }, [rol, kullaniciId]);
+
+  useEffect(() => { ilkYuklemeGetir(); }, [ilkYuklemeGetir]);
 
   const calisanSec = (calisan) => {
     setSecilenCalisan(calisan);
@@ -42,48 +141,29 @@ function Gecmis() {
     return isim.includes(arama.toLowerCase()) && depEsles;
   });
 
-  const skorRenk = (skor) => skor >= 80 ? '#34d399' : skor >= 60 ? '#fbbf24' : '#fb7185';
-
   if (rol === 'Employee') {
     return (
       <div style={styles.sayfa}>
+        <style>{`
+          @media (max-width: 768px) {
+            .icerik-responsive { margin-left: 0 !important; margin-top: 56px !important; padding: 20px 16px !important; min-width: 0 !important; }
+          }
+        `}</style>
         <Sidebar />
-        <div style={styles.icerik}>
+        <div className="icerik-responsive" style={styles.icerik}>
           <div style={{ marginBottom: '28px', borderBottom: '1px solid #2a2a2a', paddingBottom: '20px' }}>
             <h2 style={styles.baslik}>Değerlendirme Geçmişim</h2>
             <p style={styles.altBaslik}>Size yapılan tüm değerlendirmeler</p>
           </div>
-          <div style={styles.kart}>
-            {degerlendirmeler.length === 0 ? (
-              <div style={styles.bos}>Henüz değerlendirme kaydı bulunmuyor.</div>
-            ) : (
-              <table style={styles.tablo}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Dönem</th>
-                    <th style={styles.th}>Tarih</th>
-                    <th style={styles.th}>Toplam Skor</th>
-                    <th style={styles.th}>Yorum</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {degerlendirmeler.map((d, i) => {
-                    const skor = d.toplamSkor;
-                    return (
-                      <tr key={i} style={styles.satir}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-                        <td style={styles.td}><span style={styles.donemBadge}>{d.donem}</span></td>
-                        <td style={styles.td}>{d.tarih && !d.tarih.startsWith('0001') ? new Date(d.tarih).toLocaleDateString('tr-TR') : '-'}</td>
-                        <td style={styles.td}><span style={{ fontWeight: '700', fontSize: '15px', color: skorRenk(skor) }}>{skor != null ? parseFloat(skor).toFixed(1) : '-'}</span></td>
-                        <td style={{ ...styles.td, color: '#a0a0a0', fontSize: '13px' }}>{d.yorum || '-'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
+          {yukleniyor ? (
+            <Spinner />
+          ) : hata ? (
+            <HataKutusu mesaj={hata} onTekrarDene={ilkYuklemeGetir} />
+          ) : (
+            <div style={styles.kart}>
+              <GecmisTablosu degerlendirmeler={degerlendirmeler} calisanId={kullaniciId} />
+            </div>
+          )}
         </div>
       </div>
     );
@@ -100,17 +180,26 @@ function Gecmis() {
         .gec-arama:focus { outline: none; border-color: #6366f1 !important; box-shadow: 0 0 0 1px #6366f1; }
         .gec-chip:hover { background-color: #3a3a3a !important; color: #e5e7eb !important; border-color: #4a4a4a !important; }
         .gec-liste-item:hover { background-color: #2a2a2a !important; }
+        @media (max-width: 768px) {
+          .icerik-responsive { margin-left: 0 !important; margin-top: 56px !important; padding: 20px 16px !important; min-width: 0 !important; }
+          .gec-layout-responsive { flex-direction: column; }
+          .gec-sidebar-responsive { width: 100% !important; }
+        }
       `}</style>
       <Sidebar />
-      <div style={styles.icerik}>
+      <div className="icerik-responsive" style={styles.icerik}>
         <div style={{ marginBottom: '28px', borderBottom: '1px solid #2a2a2a', paddingBottom: '20px' }}>
           <h2 style={styles.baslik}>Değerlendirme Geçmişi</h2>
           <p style={styles.altBaslik}>Çalışan seçerek geçmiş değerlendirmeleri görüntüleyin</p>
         </div>
 
-        <div style={{ display: 'flex', gap: '24px' }}>
-          {/* Sol — çalışan listesi */}
-          <div style={{ width: '260px', flexShrink: 0 }}>
+        {yukleniyor ? (
+          <Spinner />
+        ) : hata ? (
+          <HataKutusu mesaj={hata} onTekrarDene={ilkYuklemeGetir} />
+        ) : (
+        <div className="gec-layout-responsive" style={{ display: 'flex', gap: '24px' }}>
+          <div className="gec-sidebar-responsive" style={{ width: '260px', flexShrink: 0 }}>
             <div style={{ position: 'relative', width: '100%', marginBottom: '8px' }}>
               <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, paddingLeft: '12px', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
                 <svg
@@ -147,11 +236,15 @@ function Gecmis() {
             )}
             <div className="calisan-scroll" style={styles.calisanListesi}>
               {filtreliCalisanlar.length === 0 ? (
-                <div style={{ padding: '16px', color: '#555', fontSize: '13px' }}>Sonuç bulunamadı</div>
-              ) : filtreliCalisanlar.map((c, i) => {
+                <div style={{ padding: '16px', color: '#9ca3af', fontSize: '13px' }}>Sonuç bulunamadı</div>
+              ) : filtreliCalisanlar.map(c => {
                 const secili = secilenCalisan && secilenCalisan.id === c.id;
                 return (
-                  <div key={i} onClick={() => calisanSec(c)} className={secili ? '' : 'gec-liste-item'} style={{
+                  <div key={c.id} role="button" tabIndex={0}
+                    aria-label={`${c.ad} ${c.soyad} geçmişini göster`}
+                    onClick={() => calisanSec(c)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); calisanSec(c); } }}
+                    className={secili ? '' : 'gec-liste-item'} style={{
                     padding: '12px 16px', cursor: 'pointer', borderRadius: '6px', transition: 'background-color 0.15s',
                     backgroundColor: secili ? '#2a2a3a' : 'transparent',
                     borderLeft: secili ? '3px solid #4f46e5' : '3px solid transparent',
@@ -163,7 +256,7 @@ function Gecmis() {
                         <div style={{ fontSize: '14px', color: secili ? '#818cf8' : '#e0e0e0', fontWeight: secili ? '600' : '400' }}>
                           {c.ad} {c.soyad}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{c.departman}</div>
+                        <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{c.departman}</div>
                       </div>
                     </div>
                   </div>
@@ -172,7 +265,6 @@ function Gecmis() {
             </div>
           </div>
 
-          {/* Sağ — seçilen kişinin geçmişi */}
           <div style={{ flex: 1 }}>
             {!secilenCalisan ? (
               <div style={styles.bosSecim}>
@@ -198,40 +290,13 @@ function Gecmis() {
                 </div>
 
                 <div style={styles.kart}>
-                  {degerlendirmeler.length === 0 ? (
-                    <div style={styles.bos}>Bu çalışan için henüz değerlendirme kaydı bulunmuyor.</div>
-                  ) : (
-                    <table style={styles.tablo}>
-                      <thead>
-                        <tr>
-                          <th style={styles.th}>Dönem</th>
-                          <th style={styles.th}>Tarih</th>
-                          <th style={styles.th}>Toplam Skor</th>
-                          <th style={styles.th}>Yorum</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {degerlendirmeler.map((d, i) => {
-                          const skor = d.toplamSkor;
-                          return (
-                            <tr key={i} style={styles.satir}
-                              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
-                              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-                              <td style={styles.td}><span style={styles.donemBadge}>{d.donem}</span></td>
-                              <td style={styles.td}>{d.tarih && !d.tarih.startsWith('0001') ? new Date(d.tarih).toLocaleDateString('tr-TR') : '-'}</td>
-                              <td style={styles.td}><span style={{ fontWeight: '700', fontSize: '15px', color: skorRenk(skor) }}>{skor != null ? parseFloat(skor).toFixed(1) : '-'}</span></td>
-                              <td style={{ ...styles.td, color: '#a0a0a0', fontSize: '13px' }}>{d.yorum || '-'}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )}
+                  <GecmisTablosu degerlendirmeler={degerlendirmeler} calisanId={secilenCalisan.id} />
                 </div>
               </>
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

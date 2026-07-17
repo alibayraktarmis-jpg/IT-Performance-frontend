@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
 import { IconUsers, IconUserCheck, IconBarChart, IconActivity, IconTrophy, IconHash, IconCalendar, IconQuote, IconClock } from '../components/icons';
 import FiltreButon from '../components/FiltreButon';
 import { DEPARTMANLAR } from '../constants/departmanlar';
+import { Spinner, HataKutusu } from '../components/DurumGostergesi';
 
 function Dashboard() {
+  const navigate = useNavigate();
   const rol = localStorage.getItem('rol');
   const ad = localStorage.getItem('ad');
   const soyad = localStorage.getItem('soyad');
@@ -13,11 +16,13 @@ function Dashboard() {
   const [skorData, setSkorData] = useState(null);
   const [siralama, setSiralama] = useState([]);
   const [donemSiralama, setDonemSiralama] = useState([]);
+  const [oncekiDonemSiralama, setOncekiDonemSiralama] = useState([]);
   const [degerlendirmeler, setDegerlendirmeler] = useState([]);
   const [sonDegerlendirme, setSonDegerlendirme] = useState(null);
   const [employeeGrafik, setEmployeeGrafik] = useState([]);
   const [secilenDep, setSecilenDep] = useState('Tümü');
-  const [hoveredRow, setHoveredRow] = useState(null);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [hata, setHata] = useState(null);
 
   const skorRenk = (skor) => skor == null ? '#e0e0e0' : skor >= 80 ? '#34d399' : skor >= 60 ? '#fbbf24' : '#fb7185';
 
@@ -28,8 +33,24 @@ function Dashboard() {
   };
   const guncelDonem = guncelDonemHesapla();
 
-  // Icinde bulunulan ceyregin kac gun kaldigini ve ne kadarinin gectigini hesaplar;
-  // "Bekleyen Degerlendirme" kartinda aciliyet gostermek icin kullanilir.
+  const oncekiDonemHesapla = () => {
+    const bugun = new Date();
+    let yil = bugun.getFullYear();
+    let ceyrek = Math.floor(bugun.getMonth() / 3) + 1 - 1;
+    if (ceyrek < 1) { ceyrek = 4; yil -= 1; }
+    return `${yil} Q${ceyrek}`;
+  };
+  const oncekiDonem = oncekiDonemHesapla();
+
+  const trendHesapla = (calisanId) => {
+    const guncel = donemSiralama.find(s => s.id === calisanId)?.ortalamaToplamSkor;
+    const onceki = oncekiDonemSiralama.find(s => s.id === calisanId)?.ortalamaToplamSkor;
+    if (guncel == null || onceki == null) return null;
+    const fark = parseFloat((guncel - onceki).toFixed(1));
+    if (fark === 0) return null;
+    return { fark, yukariMi: fark > 0 };
+  };
+
   const donemBilgisiHesapla = () => {
     const bugun = new Date();
     const ceyrekBaslangicAy = Math.floor(bugun.getMonth() / 3) * 3;
@@ -48,13 +69,18 @@ function Dashboard() {
     ? { renk: '#fbbf24', bg: 'rgba(245,158,11,0.1)' }
     : { renk: '#60a5fa', bg: 'rgba(59,130,246,0.1)' };
 
-  useEffect(() => {
-    api.get('/Degerlendirmeler/siralama').then(res => setSiralama(res.data)).catch(() => {});
-    api.get(`/Degerlendirmeler/siralama?donem=${encodeURIComponent(guncelDonem)}`).then(res => setDonemSiralama(res.data)).catch(() => {});
+  const veriGetir = useCallback(() => {
+    setYukleniyor(true);
+    setHata(null);
+    const istekler = [
+      api.get('/Degerlendirmeler/siralama').then(res => setSiralama(res.data)),
+      api.get(`/Degerlendirmeler/siralama?donem=${encodeURIComponent(guncelDonem)}`).then(res => setDonemSiralama(res.data)),
+      api.get(`/Degerlendirmeler/siralama?donem=${encodeURIComponent(oncekiDonem)}`).then(res => setOncekiDonemSiralama(res.data)),
+    ];
 
     if (rol === 'Employee') {
-      api.get(`/Degerlendirmeler/skor/${id}`).then(res => setSkorData(res.data)).catch(() => {});
-      api.get(`/Degerlendirmeler/calisan/${id}`).then(res => {
+      istekler.push(api.get(`/Degerlendirmeler/skor/${id}`).then(res => setSkorData(res.data)));
+      istekler.push(api.get(`/Degerlendirmeler/calisan/${id}`).then(res => {
         const liste = res.data;
         setDegerlendirmeler(liste);
         if (liste.length > 0) {
@@ -77,12 +103,24 @@ function Dashboard() {
             skor: parseFloat((skorlar.reduce((s, x) => s + x, 0) / skorlar.length).toFixed(2))
           }));
         setEmployeeGrafik(grafik);
-      }).catch(() => {});
+      }));
     }
-  }, [id, rol, guncelDonem]);
+
+    Promise.all(istekler)
+      .then(() => setYukleniyor(false))
+      .catch(() => { setHata('Veriler yüklenemedi.'); setYukleniyor(false); });
+  }, [id, rol, guncelDonem, oncekiDonem]);
+
+  useEffect(() => { veriGetir(); }, [veriGetir]);
 
   const genelOrtalama = employeeGrafik.length > 0
     ? (employeeGrafik.reduce((s, x) => s + x.skor, 0) / employeeGrafik.length).toFixed(1)
+    : null;
+
+  const buYil = new Date().getFullYear().toString();
+  const buYilGrafik = employeeGrafik.filter(x => x.name.startsWith(buYil));
+  const buYilOrtalama = buYilGrafik.length > 0
+    ? (buYilGrafik.reduce((s, x) => s + x.skor, 0) / buYilGrafik.length).toFixed(1)
     : null;
 
   const enYuksek = employeeGrafik.length > 0
@@ -93,23 +131,38 @@ function Dashboard() {
     <div style={styles.sayfa}>
       <style>{`
         .dash-kart:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.35); border-color: #3f3f4a !important; }
+        .dash-satir td { transition: background-color 0.15s; }
+        .dash-satir:hover td { background-color: rgba(255,255,255,0.05); }
+        .bekleyen-satir:hover { background-color: rgba(255,255,255,0.05) !important; }
+        @media (max-width: 768px) {
+          .icerik-responsive { margin-left: 0 !important; margin-top: 56px !important; padding: 20px 16px !important; min-width: 0 !important; }
+          .kart-grid-responsive { grid-template-columns: 1fr !important; }
+          .kart-grid-responsive > * { min-width: 0 !important; }
+        }
       `}</style>
       <Sidebar />
-      <div style={styles.icerik}>
+      <div className="icerik-responsive" style={styles.icerik}>
         <div style={{ marginBottom: '28px', borderBottom: '1px solid #2a2a2a', paddingBottom: '20px' }}>
           <h2 style={styles.baslik}>Dashboard</h2>
           <p style={styles.altBaslik}>Hoş geldin, {ad} {soyad}</p>
         </div>
 
+        {yukleniyor ? (
+          <Spinner />
+        ) : hata ? (
+          <HataKutusu mesaj={hata} onTekrarDene={veriGetir} />
+        ) : (
+        <>
         {rol === 'Employee' && (
           <>
-            <div style={styles.kartGrid}>
+            <div className="kart-grid-responsive" style={styles.kartGrid}>
               <div className="dash-kart" style={styles.kart}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={styles.kartEtiket}>Genel Ortalama</div>
+                  <div style={styles.kartEtiket}>{buYil} Ortalaması</div>
                   <div style={{ ...styles.kartIkon, backgroundColor: 'rgba(16,185,129,0.1)', color: '#34d399' }}><IconActivity size={20} /></div>
                 </div>
-                <div style={styles.kartDeger}>{genelOrtalama ?? '-'}</div>
+                <div style={styles.kartDeger}>{buYilOrtalama ?? '-'}</div>
+                <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>Tüm zamanlar: {genelOrtalama ?? '-'}</div>
               </div>
               <div className="dash-kart" style={styles.kart}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -148,11 +201,11 @@ function Dashboard() {
               <div style={styles.bolum}>
                 <div style={styles.bolumBaslik}>Kategori Skorlarım</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {skorData.kategoriDetay.map((k, i) => {
+                  {skorData.kategoriDetay.map(k => {
                     const puan = k.ortalamaPuan ?? 0;
                     const yuzde = (puan / 5) * 100;
                     return (
-                      <div key={i}>
+                      <div key={k.baslik}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                           <span style={{ fontSize: '14px', color: '#e0e0e0' }}>{k.baslik}</span>
                           <span style={{ fontSize: '14px', fontWeight: '600', color: '#4f46e5' }}>{puan ? puan.toFixed(1) : '-'} / 5</span>
@@ -188,24 +241,21 @@ function Dashboard() {
               const depFiltreli = siralama.filter(s =>
                 s.rol === 'Employee' && (secilenDep === 'Tümü' ? true : s.departman === secilenDep)
               );
-              // Genel Ortalama karti tum zamanlarin ortalamasini gosterir (donem bagimsiz).
               const degerlendirilenTumZamanlar = depFiltreli.filter(s => s.ortalamaToplamSkor);
               const ortalama = degerlendirilenTumZamanlar.length > 0
                 ? (degerlendirilenTumZamanlar.reduce((a, b) => a + b.ortalamaToplamSkor, 0) / degerlendirilenTumZamanlar.length).toFixed(1)
                 : '-';
 
-              // Evaluator'da Degerlendirilen/Bekleyen kartlari sadece icinde bulunulan doneme (orn. 2026 Q3)
-              // gore hesaplanir; gecmis donemde yapilmis bir degerlendirme, yeni donem baslayinca "bekleyen"
-              // sayacini tekrar dolduruir. Admin'de Bekleyen karti hic gosterilmedigi icin Degerlendirilen
-              // yine tum-zamanlar mantigiyla kalir (aksi halde tek basina anlamsiz/kafa karistirici olurdu).
               const donemDepFiltreli = donemSiralama.filter(s =>
                 s.rol === 'Employee' && (secilenDep === 'Tümü' ? true : s.departman === secilenDep)
               );
               const degerlendirilenBuDonem = donemDepFiltreli.filter(s => s.ortalamaToplamSkor);
               const bekleyen = donemDepFiltreli.length - degerlendirilenBuDonem.length;
+              const bekleyenListesi = donemDepFiltreli.filter(s => !s.ortalamaToplamSkor);
               const degerlendirilen = rol === 'Evaluator' ? degerlendirilenBuDonem : degerlendirilenTumZamanlar;
               return (
-                <div style={{ ...styles.kartGrid, gridTemplateColumns: rol === 'Evaluator' ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)' }}>
+                <>
+                <div className="kart-grid-responsive" style={{ ...styles.kartGrid, gridTemplateColumns: rol === 'Evaluator' ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)' }}>
                   <div className="dash-kart" style={styles.kart}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={styles.kartEtiket}>Toplam Çalışan</div>
@@ -242,20 +292,46 @@ function Dashboard() {
                     <div style={styles.kartDeger}>{ortalama}</div>
                   </div>
                 </div>
+
+                {rol === 'Evaluator' && bekleyenListesi.length > 0 && (
+                  <div style={styles.bolum}>
+                    <div style={styles.bolumBaslik}>Bu Dönem Henüz Değerlendirmedin</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {bekleyenListesi.map(s => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          className="bekleyen-satir"
+                          onClick={() => navigate('/degerlendirme', { state: { calisanId: s.id } })}
+                          style={styles.bekleyenSatir}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={styles.avatarKucuk}>{s.ad?.[0]}{s.soyad?.[0]}</div>
+                            <span>{s.ad} {s.soyad}</span>
+                            <span style={{ fontSize: '12px', color: '#6b7280' }}>{s.departman}</span>
+                          </div>
+                          <span style={{ fontSize: '13px', color: '#818cf8', fontWeight: '600' }}>Değerlendir →</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                </>
               );
             })()}
 
             <div style={styles.bolum}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                 <div style={styles.bolumBaslik}>Sıralama</div>
                 {rol === 'Admin' && (
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {['Tümü', ...DEPARTMANLAR].map(dep => (
                       <FiltreButon key={dep} label={dep} aktif={secilenDep === dep} onClick={() => setSecilenDep(dep)} />
                     ))}
                   </div>
                 )}
               </div>
+              <div style={{ overflowX: 'auto' }}>
               <table style={styles.tabloEl}>
                 <thead>
                   <tr style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderBottom: '1px solid #333' }}>
@@ -272,15 +348,13 @@ function Dashboard() {
                       s.rol === 'Employee' && (secilenDep === 'Tümü' ? true : s.departman === secilenDep)
                     );
                     return filtreli.length > 0 ? filtreli.map((s, i) => {
-                      const tdBg = hoveredRow === i ? 'rgba(255,255,255,0.05)' : 'transparent';
                       return (
                         <tr
-                          key={i}
-                          onMouseEnter={() => setHoveredRow(i)}
-                          onMouseLeave={() => setHoveredRow(null)}
+                          key={s.id}
+                          className="dash-satir"
                           style={{ cursor: 'default' }}
                         >
-                          <td style={{ ...styles.td, textAlign: 'center', width: '40px', paddingLeft: '8px', paddingRight: '8px', backgroundColor: tdBg, borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px', transition: 'background-color 0.15s' }}>
+                          <td style={{ ...styles.td, textAlign: 'center', width: '40px', paddingLeft: '8px', paddingRight: '8px', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>
                             {i < 3 ? (
                               <span style={{
                                 ...styles.siraNo,
@@ -293,14 +367,14 @@ function Dashboard() {
                               <span style={styles.siraNoDuz}>{i + 1}</span>
                             )}
                           </td>
-                          <td style={{ ...styles.td, backgroundColor: tdBg, transition: 'background-color 0.15s' }}>
+                          <td style={styles.td}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               <div style={styles.avatarKucuk}>{s.ad?.[0]}{s.soyad?.[0]}</div>
                               <span>{s.ad} {s.soyad}</span>
                             </div>
                           </td>
-                          <td style={{ ...styles.td, backgroundColor: tdBg, transition: 'background-color 0.15s' }}>{s.departman}</td>
-                          <td style={{ ...styles.td, backgroundColor: tdBg, transition: 'background-color 0.15s' }}>
+                          <td style={styles.td}>{s.departman}</td>
+                          <td style={styles.td}>
                             <span style={{
                               display: 'inline-flex', alignItems: 'center',
                               padding: '2px 10px', borderRadius: '6px',
@@ -311,10 +385,22 @@ function Dashboard() {
                               {s.rol}
                             </span>
                           </td>
-                          <td style={{ ...styles.td, textAlign: 'right', backgroundColor: tdBg, borderTopRightRadius: '8px', borderBottomRightRadius: '8px', transition: 'background-color 0.15s' }}>
+                          <td style={{ ...styles.td, textAlign: 'right', borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>
                             <span style={{ fontWeight: '600', color: skorRenk(s.ortalamaToplamSkor) }}>
                               {s.ortalamaToplamSkor ? s.ortalamaToplamSkor.toFixed(2) : '-'}
                             </span>
+                            {(() => {
+                              const trend = trendHesapla(s.id);
+                              if (!trend) return null;
+                              return (
+                                <span
+                                  title={`Önceki döneme göre ${trend.yukariMi ? '+' : ''}${trend.fark}`}
+                                  style={{ marginLeft: '8px', fontSize: '12px', fontWeight: '600', color: trend.yukariMi ? '#34d399' : '#fb7185' }}
+                                >
+                                  {trend.yukariMi ? '↑' : '↓'} {trend.yukariMi ? '+' : ''}{trend.fark}
+                                </span>
+                              );
+                            })()}
                           </td>
                         </tr>
                       );
@@ -324,8 +410,11 @@ function Dashboard() {
                   })()}
                 </tbody>
               </table>
+              </div>
             </div>
           </>
+        )}
+        </>
         )}
       </div>
     </div>
@@ -350,6 +439,11 @@ const styles = {
   siraNo: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '50%', fontSize: '13px', fontWeight: '700' },
   siraNoDuz: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', fontSize: '13px', fontWeight: '600', color: '#64748b' },
   avatarKucuk: { width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'rgba(99,102,241,0.2)', color: '#a5b4fc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600', flexShrink: 0 },
+  bekleyenSatir: {
+    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '12px 14px', borderRadius: '8px', border: 'none', backgroundColor: 'transparent',
+    color: '#e0e0e0', cursor: 'pointer', fontFamily: 'inherit', fontSize: '14px', transition: 'background-color 0.15s',
+  },
 };
 
 export default Dashboard;

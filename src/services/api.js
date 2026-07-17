@@ -17,7 +17,8 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const girisIstegiMi = error.config?.url?.includes('/Kullanicilar/login');
+    if (error.response?.status === 401 && !girisIstegiMi) {
       localStorage.clear();
       window.location.href = '/login';
     }

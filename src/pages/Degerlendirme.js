@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
-import { IconInfo } from '../components/icons';
+import { IconInfo, IconAlertTriangle } from '../components/icons';
+import { toastGoster } from '../services/toast';
 import FiltreButon from '../components/FiltreButon';
 import { DEPARTMANLAR, DEPARTMAN_KISA_AD } from '../constants/departmanlar';
+import { Spinner, HataKutusu } from '../components/DurumGostergesi';
 
 const puanRenkleri = {
   1: { hex: '#f87171', rgb: '248,113,113' },
@@ -18,8 +21,8 @@ const puanEtiketleri = { 1: 'Yetersiz', 2: 'Gelişmeli', 3: 'Ortalama', 4: 'İyi
 const depToRol = { 'İş Analistleri': 'Analist', 'Yazılımcılar': 'Yazılımcı', 'QA/Test Uzmanları': 'QA' };
 
 function Degerlendirme() {
+  const location = useLocation();
   const mevcutRol = localStorage.getItem('rol');
-  const mevcutDepartman = localStorage.getItem('departman');
   const [calisanlar, setCalisanlar] = useState([]);
   const [anaBasliklar, setAnaBasliklar] = useState([]);
   const [altKriterler, setAltKriterler] = useState([]);
@@ -36,40 +39,72 @@ function Degerlendirme() {
   const [donemYil, setDonemYil] = useState(2025);
   const [calisanDonemler, setCalisanDonemler] = useState([]);
   const [tumDegerlendirmeler, setTumDegerlendirmeler] = useState([]);
-  const [basari, setBasari] = useState('');
-  const [hata, setHata] = useState('');
   const [mevcutDegerlendirmeId, setMevcutDegerlendirmeId] = useState(null);
   const [guncellemeMode, setGuncellemeMode] = useState(false);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [sayfaHatasi, setSayfaHatasi] = useState(null);
+  const [taslakBildirimi, setTaslakBildirimi] = useState(null);
+  const taslaktanRestoreEdildiRef = useRef(false);
   const degerlendiriciId = localStorage.getItem('id');
 
   useEffect(() => {
-    // Departman filtresi sadece Admin icin bir UI kolayligidir (secim cip'leri Admin'e ozel).
-    // Evaluator icin burada mevcutDepartman'a gore otomatik filtre uygulamiyoruz: backend zaten
-    // /Kullanicilar cagrisinda Evaluator'a sadece kendi ekibini donuyor, ekstra departman filtresi
-    // Evaluator'in departmani sonradan degistirilirse (eski localStorage degeri yuzunden) kendi
-    // ekibinin arama kutusunda hic gorunmemesine yol acardi.
-    api.get('/Kullanicilar').then(res => {
-      setCalisanlar(res.data.filter(k => k.rol === 'Employee' && k.aktifMi));
-    }).catch(() => {});
-    api.get('/Degerlendirmeler').then(res => setTumDegerlendirmeler(res.data || [])).catch(() => {});
-    api.get('/AnaBasliklar?sadaceAktif=true').then(res => {
-      setAnaBasliklar(res.data);
-    }).catch(() => {});
-    api.get('/AltKriterler?sadaceAktif=true').then(async res => {
-      const aktifler = res.data;
-      setAltKriterler(aktifler);
-      const aciklamaMap = {};
-      await Promise.all(aktifler.map(async ak => {
-        try {
-          const r = await api.get(`/KriterAciklamalar/kriter/${ak.id}`);
-          aciklamaMap[ak.id] = r.data;
-        } catch {}
-      }));
-      setKriterAciklamalar(aciklamaMap);
-    }).catch(() => {});
-  }, [mevcutRol, mevcutDepartman]);
+    const kayitli = localStorage.getItem('degerlendirmeTaslak');
+    if (!kayitli) return;
+    try {
+      setTaslakBildirimi(JSON.parse(kayitli));
+    } catch {
+      localStorage.removeItem('degerlendirmeTaslak');
+    }
+  }, []);
 
-  // Çalışan değişince o çalışanın tüm dönemlerini çek
+  const ilkYuklemeGetir = useCallback(() => {
+    setYukleniyor(true);
+    setSayfaHatasi(null);
+    Promise.all([
+      api.get('/Kullanicilar').then(res => {
+        setCalisanlar(res.data.filter(k => k.rol === 'Employee' && k.aktifMi));
+      }),
+      api.get('/Degerlendirmeler').then(res => setTumDegerlendirmeler(res.data || [])),
+      api.get('/AnaBasliklar?sadaceAktif=true').then(res => {
+        setAnaBasliklar(res.data);
+      }),
+      api.get('/AltKriterler?sadaceAktif=true').then(res => setAltKriterler(res.data)),
+      api.get('/KriterAciklamalar').then(res => {
+        const aciklamaMap = {};
+        res.data.forEach(a => {
+          (aciklamaMap[a.altKriterId] = aciklamaMap[a.altKriterId] || []).push(a);
+        });
+        setKriterAciklamalar(aciklamaMap);
+      }),
+    ])
+      .then(() => setYukleniyor(false))
+      .catch(() => { setSayfaHatasi('Veriler yüklenemedi.'); setYukleniyor(false); });
+  }, []);
+
+  useEffect(() => { ilkYuklemeGetir(); }, [ilkYuklemeGetir]);
+
+  useEffect(() => {
+    const escKapat = (e) => {
+      if (e.key !== 'Escape') return;
+      setAramaAcik(false);
+      setDonemAcik(false);
+    };
+    document.addEventListener('keydown', escKapat);
+    return () => document.removeEventListener('keydown', escKapat);
+  }, []);
+
+  // Dashboard'daki "Bu Dönem Henüz Değerlendirmedin" listesinden bir çalışana tıklanarak
+  // gelindiyse, o çalışan otomatik seçili gelsin.
+  useEffect(() => {
+    const hedefCalisanId = location.state?.calisanId;
+    if (!hedefCalisanId || secilenCalisan || calisanlar.length === 0) return;
+    const c = calisanlar.find(k => k.id === hedefCalisanId);
+    if (!c) return;
+    setSecilenCalisan(String(c.id));
+    setSecilenCalisanRol(c.departman || '');
+    setAramaMetni(`${c.ad} ${c.soyad}`);
+  }, [calisanlar, location.state, secilenCalisan]);
+
   useEffect(() => {
     if (!secilenCalisan) { setCalisanDonemler([]); return; }
     api.get(`/Degerlendirmeler/calisan/${secilenCalisan}`)
@@ -77,7 +112,6 @@ function Degerlendirme() {
       .catch(() => setCalisanDonemler([]));
   }, [secilenCalisan]);
 
-  // Çalışan veya dönem değişince mevcut değerlendirmeyi çek
   useEffect(() => {
     if (!secilenCalisan || !secilenDonem) {
       setMevcutDegerlendirmeId(null);
@@ -100,6 +134,8 @@ function Degerlendirme() {
           puanMap[d.altKriterId] = d.puan;
         });
         setPuanlar(puanMap);
+      } else if (taslaktanRestoreEdildiRef.current) {
+        taslaktanRestoreEdildiRef.current = false;
       } else {
         setMevcutDegerlendirmeId(null);
         setGuncellemeMode(false);
@@ -112,6 +148,37 @@ function Degerlendirme() {
     });
   }, [secilenCalisan, secilenDonem]);
 
+  useEffect(() => {
+    if (guncellemeMode || !secilenCalisan || !secilenDonem) return;
+    const doluMu = Object.values(puanlar).some(p => p > 0) || yorum.trim().length > 0;
+    if (!doluMu) return;
+    localStorage.setItem('degerlendirmeTaslak', JSON.stringify({
+      calisanId: secilenCalisan,
+      calisanAdi: aramaMetni,
+      calisanRol: secilenCalisanRol,
+      donem: secilenDonem,
+      puanlar,
+      yorum,
+    }));
+  }, [guncellemeMode, secilenCalisan, secilenDonem, secilenCalisanRol, aramaMetni, puanlar, yorum]);
+
+  const taslagiYukle = () => {
+    if (!taslakBildirimi) return;
+    taslaktanRestoreEdildiRef.current = true;
+    setSecilenCalisan(taslakBildirimi.calisanId);
+    setSecilenCalisanRol(taslakBildirimi.calisanRol || '');
+    setAramaMetni(taslakBildirimi.calisanAdi || '');
+    setSecilenDonem(taslakBildirimi.donem);
+    setPuanlar(taslakBildirimi.puanlar || {});
+    setYorum(taslakBildirimi.yorum || '');
+    setTaslakBildirimi(null);
+  };
+
+  const taslagiSil = () => {
+    localStorage.removeItem('degerlendirmeTaslak');
+    setTaslakBildirimi(null);
+  };
+
   const puanDegistir = (altKriterId, puan) => {
     setPuanlar(prev => ({
       ...prev,
@@ -122,10 +189,12 @@ function Degerlendirme() {
   const toplamSkorHesapla = () => {
     let toplam = 0;
     anaBasliklar.forEach(ab => {
-      const abAltKriterler = altKriterler.filter(ak => ak.anaBaslikId === ab.id);
-      if (abAltKriterler.length === 0) return;
-      const puanToplam = abAltKriterler.reduce((acc, ak) => acc + (puanlar[ak.id] || 0), 0);
-      const ortalama = puanToplam / abAltKriterler.length;
+      const puanlananlar = altKriterler
+        .filter(ak => ak.anaBaslikId === ab.id)
+        .map(ak => puanlar[ak.id] || 0)
+        .filter(p => p > 0);
+      if (puanlananlar.length === 0) return;
+      const ortalama = puanlananlar.reduce((acc, p) => acc + p, 0) / puanlananlar.length;
       toplam += (ab.agirlikYuzdesi / 100) * (ortalama / 5) * 100;
     });
     return Math.round(toplam * 100) / 100;
@@ -135,51 +204,51 @@ function Degerlendirme() {
   const doldurulanKriterSayisi = Object.values(puanlar).filter(p => p > 0).length;
   const doluluk = toplamKriterSayisi > 0 ? Math.round((doldurulanKriterSayisi / toplamKriterSayisi) * 100) : 0;
 
+  const aramaTusYonet = (e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    if (!aramaAcik) { setAramaAcik(true); return; }
+    const secenekler = Array.from(e.currentTarget.querySelectorAll('[role="option"]'));
+    if (!secenekler.length) return;
+    const aktif = secenekler.indexOf(document.activeElement);
+    const sonraki = e.key === 'ArrowDown'
+      ? Math.min(aktif + 1, secenekler.length - 1)
+      : Math.max(aktif - 1, 0);
+    secenekler[sonraki].focus();
+  };
+
 const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!secilenCalisan) { setHata('Lütfen bir çalışan seçin.'); return; }
-    if (!secilenDonem) { setHata('Lütfen bir dönem seçin.'); return; }
+    if (!secilenCalisan) { toastGoster('Lütfen bir çalışan seçin.', 'hata'); return; }
+    if (!secilenDonem) { toastGoster('Lütfen bir dönem seçin.', 'hata'); return; }
 
-    const toplamSkor = toplamSkorHesapla();
     const detaylar = Object.entries(puanlar)
       .filter(([, puan]) => puan > 0)
       .map(([altKriterId, puan]) => ({ altKriterId: parseInt(altKriterId), puan }));
 
     try {
-      if (guncellemeMode && mevcutDegerlendirmeId) {
-        await api.put(`/Degerlendirmeler/${mevcutDegerlendirmeId}/detaylar`, {
-          yorum,
-          toplamSkor,
-          detaylar
-        });
-        setBasari(`Değerlendirme güncellendi. Toplam Skor: ${toplamSkor}`);
-      } else {
+      const guncellemeydi = guncellemeMode && mevcutDegerlendirmeId;
+      let degerlendirmeId = mevcutDegerlendirmeId;
+
+      if (!guncellemeydi) {
         const degRes = await api.post('/Degerlendirmeler', {
           degerlendiricId: parseInt(degerlendiriciId),
           calisanId: parseInt(secilenCalisan),
           tarih: new Date().toISOString(),
           donem: secilenDonem,
-          yorum,
-          toplamSkor
+          yorum
         });
-        const degerlendirmeId = degRes.data.id;
-        for (const [altKriterId, puan] of Object.entries(puanlar)) {
-          if (puan > 0) {
-            await api.post('/DegerlendirmeDetaylar', {
-              degerlendirmeId,
-              altKriterId: parseInt(altKriterId),
-              puan
-            });
-          }
-        }
-        setBasari(`Değerlendirme kaydedildi. Toplam Skor: ${toplamSkor}`);
+        degerlendirmeId = degRes.data.id;
         setGuncellemeMode(true);
         setMevcutDegerlendirmeId(degerlendirmeId);
         setCalisanDonemler(prev => [...prev, secilenDonem]);
       }
-      setHata('');
+
+      const res = await api.put(`/Degerlendirmeler/${degerlendirmeId}/detaylar`, { yorum, detaylar });
+      toastGoster(`${guncellemeydi ? 'Değerlendirme güncellendi' : 'Değerlendirme kaydedildi'}. Toplam Skor: ${res.data.toplamSkor}`, 'basari');
+      localStorage.removeItem('degerlendirmeTaslak');
     } catch (err) {
-      setHata(err.response?.data?.mesaj || 'Değerlendirme kaydedilirken hata oluştu.');
+      toastGoster(err.response?.data?.mesaj || 'Değerlendirme kaydedilirken hata oluştu.', 'hata');
     }
   };
 
@@ -191,9 +260,17 @@ const handleSubmit = async (e) => {
           border-color: #4f46e5 !important;
           box-shadow: 0 0 0 1px #4f46e5;
         }
+        .calisan-secenek:hover { background-color: #242424 !important; }
+        .puan-wrap .tooltip { display: none; }
+        .puan-wrap:hover .tooltip, .puan-wrap:focus-within .tooltip { display: block; }
+        @media (max-width: 768px) {
+          .icerik-responsive { margin-left: 0 !important; margin-top: 56px !important; padding: 20px 16px 170px !important; min-width: 0 !important; }
+          .deg-secim-responsive { grid-template-columns: 1fr !important; }
+          .deg-altbar-responsive { left: 0 !important; padding: 16px 20px !important; flex-direction: column; align-items: stretch !important; gap: 12px; }
+        }
       `}</style>
       <Sidebar />
-      <div style={styles.icerik}>
+      <div className="icerik-responsive" style={styles.icerik}>
         <div style={styles.topBar}>
           <div>
             <h2 style={styles.baslik}>Performans Değerlendirme</h2>
@@ -201,8 +278,18 @@ const handleSubmit = async (e) => {
           </div>
         </div>
 
-        {basari && <div style={styles.basariKutusu}>{basari}</div>}
-        {hata && <div style={styles.hataKutusu}>{hata}</div>}
+        {taslakBildirimi && (
+          <div style={styles.taslakKutusu}>
+            <span style={{ color: '#fbbf24', flexShrink: 0, display: 'flex' }}><IconAlertTriangle /></span>
+            <span style={{ flex: 1 }}>
+              <strong>{taslakBildirimi.calisanAdi}</strong> için {taslakBildirimi.donem} döneminde kaydedilmemiş bir taslağınız var.
+            </span>
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+              <button type="button" onClick={taslagiYukle} style={styles.taslakYukleButon}>Taslağı Yükle</button>
+              <button type="button" onClick={taslagiSil} style={styles.taslakSilButon}>Sil</button>
+            </div>
+          </div>
+        )}
 
         {guncellemeMode && (
           <div style={styles.bilgiKutusu}>
@@ -211,10 +298,15 @@ const handleSubmit = async (e) => {
           </div>
         )}
 
+        {yukleniyor ? (
+          <Spinner />
+        ) : sayfaHatasi ? (
+          <HataKutusu mesaj={sayfaHatasi} onTekrarDene={ilkYuklemeGetir} />
+        ) : (
         <form onSubmit={handleSubmit}>
           <div style={styles.ustForm}>
             {mevcutRol === 'Admin' && (
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {DEPARTMANLAR.map(dep => {
                   const aktif = secilenDep === dep;
                   return (
@@ -224,25 +316,34 @@ const handleSubmit = async (e) => {
                 })}
               </div>
             )}
-            <div style={styles.secimSatiri}>
+            <div className="deg-secim-responsive" style={styles.secimSatiri}>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Çalışan Seçin</label>
-                <div style={{ position: 'relative' }}>
+              <label htmlFor="calisan-arama" style={styles.label}>Çalışan Seçin</label>
+                <div
+                  style={{ position: 'relative' }}
+                  onKeyDown={aramaTusYonet}
+                  onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setAramaAcik(false); }}
+                >
                   {secilenCalisan && (
-                    <button type="button" onClick={() => { setSecilenCalisan(''); setAramaMetni(''); setSecilenCalisanRol(''); }}
-                      style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: '#2a2a2a', border: '1px solid #333', borderRadius: '50%', color: '#666', fontSize: '14px', cursor: 'pointer', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>×</button>
+                    <button type="button" aria-label="Çalışan seçimini temizle"
+                      onClick={() => { setSecilenCalisan(''); setAramaMetni(''); setSecilenCalisanRol(''); }}
+                      style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: '#2a2a2a', border: '1px solid #333', borderRadius: '50%', color: '#9ca3af', fontSize: '14px', cursor: 'pointer', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>×</button>
                   )}
                   <input
+                    id="calisan-arama"
+                    role="combobox"
+                    aria-expanded={aramaAcik}
+                    aria-controls="calisan-listbox"
+                    aria-autocomplete="list"
                     style={{ ...styles.input, width: '100%', boxSizing: 'border-box', paddingRight: secilenCalisan ? '40px' : '12px' }}
                     placeholder={secilenDep ? `${secilenDep} içinde ara...` : 'İsim yazarak arayın...'}
                     value={aramaMetni}
                     onChange={e => { setAramaMetni(e.target.value); setAramaAcik(true); }}
                     onFocus={() => setAramaAcik(true)}
-                    onBlur={() => setTimeout(() => setAramaAcik(false), 150)}
                     autoComplete="off"
                   />
                   {aramaAcik && (
-                    <div style={{
+                    <div id="calisan-listbox" role="listbox" style={{
                       position: 'absolute', top: '44px', left: 0, right: 0, zIndex: 100,
                       backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px',
                       maxHeight: '220px', overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
@@ -254,7 +355,7 @@ const handleSubmit = async (e) => {
                           return tam.includes(aramaMetni.toLowerCase()) && depEsles;
                         });
                         if (filtrelenmis.length === 0) return (
-                          <div style={{ padding: '12px 16px', color: '#555', fontSize: '13px' }}>Sonuç bulunamadı</div>
+                          <div style={{ padding: '12px 16px', color: '#9ca3af', fontSize: '13px' }}>Sonuç bulunamadı</div>
                         );
                         const gruplar = secilenDep ? [secilenDep] : DEPARTMANLAR;
                         return gruplar.map(dep => {
@@ -262,7 +363,7 @@ const handleSubmit = async (e) => {
                           if (grup.length === 0) return null;
                           return (
                             <div key={dep}>
-                              {!secilenDep && <div style={{ padding: '8px 14px 4px', fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '1px' }}>{dep}</div>}
+                              {!secilenDep && <div style={{ padding: '8px 14px 4px', fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px' }}>{dep}</div>}
                               {grup.map(c => {
                                 const id = c.id;
                                 const isim = `${c.ad} ${c.soyad}`;
@@ -271,25 +372,28 @@ const handleSubmit = async (e) => {
                                   d => d.calisanId === id && d.donem === secilenDonem
                                 );
                                 return (
-                                  <div key={id}
-                                    onMouseDown={() => {
+                                  <button key={id}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={secili}
+                                    className="calisan-secenek"
+                                    onClick={() => {
                                       setSecilenCalisan(String(id));
                                       setSecilenCalisanRol(c.departman || '');
                                       setAramaMetni(isim);
                                       setAramaAcik(false);
                                     }}
                                     style={{
+                                      width: '100%', textAlign: 'left', border: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
                                       padding: '10px 16px', cursor: 'pointer', fontSize: '14px',
                                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                                       backgroundColor: secili ? '#2a2a3a' : 'transparent',
                                       color: secili ? '#818cf8' : '#e0e0e0',
                                     }}
-                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#242424'}
-                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = secili ? '#2a2a3a' : 'transparent'}
                                   >
                                     <span>{isim}</span>
-                                    {buDonemYapildi && <span style={{ fontSize: '16px', color: '#4ade80', fontWeight: '600' }}>✓</span>}
-                                  </div>
+                                    {buDonemYapildi && <span title="Bu dönem değerlendirildi" style={{ fontSize: '16px', color: '#4ade80', fontWeight: '600' }}>✓</span>}
+                                  </button>
                                 );
                               })}
                             </div>
@@ -305,37 +409,39 @@ const handleSubmit = async (e) => {
               <div style={{ position: 'relative' }}>
                 <button type="button"
                   onClick={() => setDonemAcik(!donemAcik)}
+                  aria-expanded={donemAcik}
+                  aria-haspopup="dialog"
                   style={{
                     ...styles.input, width: '100%', textAlign: 'left', cursor: 'pointer',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    color: secilenDonem ? '#fff' : '#666'
+                    color: secilenDonem ? '#fff' : '#9ca3af',
+                    paddingRight: secilenDonem ? '56px' : undefined,
                   }}>
                   <span>📅 {secilenDonem || 'Dönem seçin...'}</span>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    {secilenDonem && (
-                      <span onClick={e => { e.stopPropagation(); setSecilenDonem(''); setDonemAcik(false); }}
-                        style={{ color: '#555', fontSize: '16px', lineHeight: 1, cursor: 'pointer', padding: '0 2px' }}>×</span>
-                    )}
-                    <span style={{ color: '#666' }}>{donemAcik ? '▲' : '▼'}</span>
-                  </div>
+                  <span style={{ color: '#9ca3af' }} aria-hidden="true">{donemAcik ? '▲' : '▼'}</span>
                 </button>
+                {secilenDonem && (
+                  <button type="button" aria-label="Dönem seçimini temizle"
+                    onClick={() => { setSecilenDonem(''); setDonemAcik(false); }}
+                    style={{ position: 'absolute', right: '34px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: '#9ca3af', fontSize: '16px', lineHeight: 1, cursor: 'pointer', padding: '0 2px' }}>×</button>
+                )}
 
                 {donemAcik && (
-                  <div style={{
+                  <div role="dialog" aria-label="Dönem seçimi" style={{
                     position: 'absolute', top: '48px', left: 0, zIndex: 100,
                     backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '10px',
                     padding: '16px', width: '280px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <span style={{ fontSize: '12px', color: '#555', textTransform: 'uppercase', letterSpacing: '1px' }}>Dönemler</span>
-                      <button type="button" onClick={() => setDonemAcik(false)}
-                        style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: '50%', color: '#666', fontSize: '14px', cursor: 'pointer', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>×</button>
+                      <span style={{ fontSize: '12px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px' }}>Dönemler</span>
+                      <button type="button" aria-label="Dönem seçiciyi kapat" onClick={() => setDonemAcik(false)}
+                        style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: '50%', color: '#9ca3af', fontSize: '14px', cursor: 'pointer', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>×</button>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                      <button type="button" onClick={() => setDonemYil(y => Math.max(2025, y - 1))}
+                      <button type="button" aria-label="Önceki yıl" disabled={donemYil <= 2025} onClick={() => setDonemYil(y => Math.max(2025, y - 1))}
                         style={{ background: 'none', border: 'none', color: donemYil <= 2025 ? '#444' : '#a0a0a0', fontSize: '18px', cursor: donemYil <= 2025 ? 'default' : 'pointer', padding: '4px 8px' }}>‹</button>
                       <span style={{ color: '#fff', fontWeight: '600', fontSize: '15px' }}>{donemYil}</span>
-                      <button type="button" onClick={() => setDonemYil(y => Math.min(2026, y + 1))}
+                      <button type="button" aria-label="Sonraki yıl" disabled={donemYil >= 2026} onClick={() => setDonemYil(y => Math.min(2026, y + 1))}
                         style={{ background: 'none', border: 'none', color: donemYil >= 2026 ? '#444' : '#a0a0a0', fontSize: '18px', cursor: donemYil >= 2026 ? 'default' : 'pointer', padding: '4px 8px' }}>›</button>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -405,26 +511,25 @@ const handleSubmit = async (e) => {
                         {[1, 2, 3, 4, 5].map(p => {
                           const secili = puanlar[ak.id] === p;
                           return (
-                            <div key={p} style={{ position: 'relative' }}
-                              onMouseEnter={e => e.currentTarget.querySelector('.tooltip').style.display = 'block'}
-                              onMouseLeave={e => e.currentTarget.querySelector('.tooltip').style.display = 'none'}
-                            >
+                            <div key={p} className="puan-wrap" style={{ position: 'relative' }}>
                               <button
                                 type="button"
+                                aria-pressed={secili}
+                                aria-label={`${ak.kriterAdi}: ${p} - ${puanEtiketleri[p]}`}
                                 onClick={() => puanDegistir(ak.id, p)}
                                 style={{
                                   ...styles.puanButon,
-                                  border: `1px solid rgba(${puanRenkleri[p].rgb}, ${secili ? '1' : '0.35'})`,
-                                  color: secili ? '#ffffff' : `rgba(${puanRenkleri[p].rgb}, 0.85)`,
-                                  backgroundColor: secili ? puanRenkleri[p].hex : '#1f2937',
-                                  fontWeight: secili ? '700' : '500',
+                                  border: `1px solid rgba(${puanRenkleri[p].rgb}, ${secili ? '1' : '0.3'})`,
+                                  color: secili ? '#ffffff' : puanRenkleri[p].hex,
+                                  backgroundColor: secili ? puanRenkleri[p].hex : `rgba(${puanRenkleri[p].rgb}, 0.08)`,
+                                  fontWeight: secili ? '700' : '600',
                                   boxShadow: secili ? `0 0 10px rgba(${puanRenkleri[p].rgb}, 0.55)` : 'none',
                                 }}
                               >
                                 {p}
                               </button>
-                              <div className="tooltip" style={{
-                                display: 'none', position: 'absolute', bottom: '42px', left: '50%',
+                              <div className="tooltip" aria-hidden="true" style={{
+                                position: 'absolute', bottom: '42px', left: '50%',
                                 transform: 'translateX(-50%)', backgroundColor: '#111', color: '#fff',
                                 padding: '4px 8px', borderRadius: '4px', fontSize: '11px',
                                 whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 10,
@@ -455,7 +560,7 @@ const handleSubmit = async (e) => {
             />
           </div>
 
-          <div style={styles.altBar}>
+          <div className="deg-altbar-responsive" style={styles.altBar}>
             <div>
               <div style={styles.skorOnizleme}>
                 Tahmini Toplam Skor: <strong style={{ color: '#818cf8', fontSize: '20px' }}>{toplamSkorHesapla()}</strong>
@@ -475,6 +580,7 @@ const handleSubmit = async (e) => {
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );
@@ -486,9 +592,10 @@ const styles = {
   topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', borderBottom: '1px solid #2a2a2a', paddingBottom: '20px' },
   baslik: { fontSize: '24px', fontWeight: '600', color: '#ffffff', margin: '0 0 6px' },
   altBaslik: { fontSize: '14px', color: '#a0a0a0', margin: 0 },
-  basariKutusu: { backgroundColor: 'rgba(20,83,45,0.3)', border: '1px solid #166534', color: '#4ade80', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
-  hataKutusu: { backgroundColor: 'rgba(69,10,10,0.3)', border: '1px solid #991b1b', color: '#f87171', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' },
   bilgiKutusu: { display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'rgba(59,130,246,0.1)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '1px solid rgba(59,130,246,0.25)', color: '#bfdbfe', padding: '14px 16px', borderRadius: '12px', marginBottom: '16px', fontSize: '13px' },
+  taslakKutusu: { display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', color: '#fde68a', padding: '14px 16px', borderRadius: '12px', marginBottom: '16px', fontSize: '13px' },
+  taslakYukleButon: { padding: '7px 14px', backgroundColor: '#fbbf24', color: '#1c1c1c', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' },
+  taslakSilButon: { padding: '7px 14px', backgroundColor: 'transparent', color: '#fde68a', border: '1px solid rgba(245,158,11,0.35)', borderRadius: '6px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap' },
   ustForm: { display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' },
   secimSatiri: { display: 'grid', gridTemplateColumns: '0.9fr 1fr', gap: '16px' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },

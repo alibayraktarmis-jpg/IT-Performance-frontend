@@ -1,7 +1,14 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { Spinner, HataKutusu } from '../components/DurumGostergesi';
+
+const secenekButonStil = {
+  display: 'block', width: '100%', textAlign: 'left', boxSizing: 'border-box',
+  padding: '9px 14px', fontSize: '13px', cursor: 'pointer',
+  border: 'none', backgroundColor: 'transparent', fontFamily: 'inherit',
+};
 
 function CustomSelect({ value, onChange, gruplar, placeholder = 'Seçin...', hideClear = false }) {
   const [acik, setAcik] = useState(false);
@@ -16,14 +23,37 @@ function CustomSelect({ value, onChange, gruplar, placeholder = 'Seçin...', hid
   const tumSecenekler = gruplar.flatMap(g => g.secenekler);
   const secilenEtiket = value ? (tumSecenekler.find(s => s.value === value)?.label ?? value) : placeholder;
 
+  const sec = (v) => { onChange(v); setAcik(false); };
+
+  const tusYonet = (e) => {
+    if (e.key === 'Escape') { setAcik(false); return; }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    if (!acik) { setAcik(true); return; }
+    const secenekler = Array.from(ref.current.querySelectorAll('[role="option"]'));
+    if (!secenekler.length) return;
+    const aktif = secenekler.indexOf(document.activeElement);
+    const sonraki = e.key === 'ArrowDown'
+      ? Math.min(aktif + 1, secenekler.length - 1)
+      : Math.max(aktif - 1, 0);
+    secenekler[sonraki].focus();
+  };
+
   return (
-    <div ref={ref} style={{ position: 'relative', minWidth: '180px' }}>
+    <div
+      ref={ref}
+      style={{ position: 'relative', minWidth: '180px' }}
+      onKeyDown={tusYonet}
+      onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setAcik(false); }}
+    >
       <button
         type="button"
         onClick={() => setAcik(a => !a)}
+        aria-haspopup="listbox"
+        aria-expanded={acik}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-          padding: '9px 14px', backgroundColor: '#1e1e1e', color: value ? '#f3f4f6' : '#6b7280',
+          padding: '9px 14px', backgroundColor: '#1e1e1e', color: value ? '#f3f4f6' : '#9ca3af',
           border: `1px solid ${acik ? '#4f46e5' : '#3a3a3a'}`, borderRadius: '6px',
           fontSize: '13px', cursor: 'pointer',
           boxShadow: acik ? '0 0 0 3px rgba(79,70,229,0.2)' : 'none',
@@ -31,52 +61,57 @@ function CustomSelect({ value, onChange, gruplar, placeholder = 'Seçin...', hid
         }}
       >
         <span>{secilenEtiket}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"
           style={{ flexShrink: 0, transform: acik ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </button>
 
       {acik && (
-        <div className="dropdown-scroll" style={{
+        <div role="listbox" className="dropdown-scroll" style={{
           position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 200,
           backgroundColor: '#1a1b23', border: '1px solid rgba(51,65,85,0.5)', borderRadius: '8px',
           backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
           boxShadow: '0 20px 40px rgba(0,0,0,0.5)', overflow: 'hidden', maxHeight: '260px', overflowY: 'auto',
         }}>
           {!hideClear && (
-            <div
-              onClick={() => { onChange(''); setAcik(false); }}
+            <button
+              type="button"
+              role="option"
+              aria-selected={!value}
+              className="rapor-secenek"
+              onClick={() => sec('')}
               style={{
-                padding: '9px 14px', fontSize: '13px', cursor: 'pointer',
+                ...secenekButonStil,
                 color: !value ? '#818cf8' : '#9ca3af',
                 backgroundColor: !value ? 'rgba(79,70,229,0.1)' : 'transparent',
               }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = !value ? 'rgba(79,70,229,0.1)' : 'transparent'}
             >
               {placeholder}
-            </div>
+            </button>
           )}
           {gruplar.map(g => (
             <div key={g.label}>
-              <div style={{ padding: '10px 12px 4px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '600', borderTop: '1px solid rgba(51,65,85,0.3)', marginTop: '2px' }}>
+              <div style={{ padding: '10px 12px 4px', fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '600', borderTop: '1px solid rgba(51,65,85,0.3)', marginTop: '2px' }}>
                 {g.label}
               </div>
               {g.secenekler.map(s => (
-                <div
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={value === s.value}
+                  className="rapor-secenek"
                   key={s.value}
-                  onClick={() => { onChange(s.value); setAcik(false); }}
+                  onClick={() => sec(s.value)}
                   style={{
-                    padding: '9px 14px 9px 20px', fontSize: '13px', cursor: 'pointer',
+                    ...secenekButonStil,
+                    paddingLeft: '20px',
                     color: value === s.value ? '#818cf8' : '#d1d5db',
                     backgroundColor: value === s.value ? 'rgba(79,70,229,0.12)' : 'transparent',
                   }}
-                  onMouseEnter={e => { if (value !== s.value) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = value === s.value ? 'rgba(79,70,229,0.12)' : 'transparent'; }}
                 >
                   {s.label}
-                </div>
+                </button>
               ))}
             </div>
           ))}
@@ -108,36 +143,76 @@ function ParlayanEksenEtiketi({ x, y, payload, highlight, renk }) {
 
 function Raporlar() {
   const [siralama, setSiralama] = useState([]);
+  const [oncekiDonemSiralama, setOncekiDonemSiralama] = useState([]);
+  const [departmanOzet, setDepartmanOzet] = useState([]);
   const [skorDetay, setSkorDetay] = useState(null);
   const [secilenCalisan, setSecilenCalisan] = useState('');
   const [calisanlar, setCalisanlar] = useState([]);
   const [donemler, setDonemler] = useState([]);
   const [secilenDonem, setSecilenDonem] = useState('');
   const [employeeGrafik, setEmployeeGrafik] = useState([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [hata, setHata] = useState(null);
   const rol = localStorage.getItem('rol');
   const id = localStorage.getItem('id');
 
   const siralamayiGetir = (donem) => {
     const params = donem ? `?donem=${encodeURIComponent(donem)}` : '';
     api.get(`/Degerlendirmeler/siralama${params}`).then(res => setSiralama(res.data)).catch(() => {});
+
+    // Trend oku icin: secili donemden bir onceki donemin siralamasini da cek.
+    // "Tum Donemler" secilmisken (donem bos) kiyaslanacak tek bir onceki donem olmadigi icin trend gosterilmez.
+    if (donem) {
+      const [yilStr, ceyrekStr] = donem.split(' ');
+      let yil = parseInt(yilStr, 10);
+      let ceyrek = parseInt((ceyrekStr || '').replace('Q', ''), 10) - 1;
+      if (ceyrek < 1) { ceyrek = 4; yil -= 1; }
+      const oncekiDonem = `${yil} Q${ceyrek}`;
+      api.get(`/Degerlendirmeler/siralama?donem=${encodeURIComponent(oncekiDonem)}`).then(res => setOncekiDonemSiralama(res.data)).catch(() => {});
+    } else {
+      setOncekiDonemSiralama([]);
+    }
   };
 
-  useEffect(() => {
-    api.get('/Degerlendirmeler/donemler').then(res => setDonemler(res.data)).catch(() => {});
-    siralamayiGetir('');
+  const departmanOzetiGetir = (donem) => {
+    const params = donem ? `?donem=${encodeURIComponent(donem)}` : '';
+    api.get(`/Degerlendirmeler/departman-ozet${params}`).then(res => setDepartmanOzet(res.data)).catch(() => {});
+  };
+
+  const trendHesapla = (calisanId) => {
+    if (!secilenDonem) return null;
+    const guncel = siralama.find(s => s.id === calisanId)?.ortalamaToplamSkor;
+    const onceki = oncekiDonemSiralama.find(s => s.id === calisanId)?.ortalamaToplamSkor;
+    if (guncel == null || onceki == null) return null;
+    const fark = parseFloat((guncel - onceki).toFixed(1));
+    if (fark === 0) return null;
+    return { fark, yukariMi: fark > 0 };
+  };
+
+  const ilkYuklemeGetir = useCallback(() => {
+    setYukleniyor(true);
+    setHata(null);
+    setOncekiDonemSiralama([]);
+    const istekler = [
+      api.get('/Degerlendirmeler/donemler').then(res => setDonemler(res.data)),
+      api.get('/Degerlendirmeler/siralama').then(res => setSiralama(res.data)),
+    ];
+
     if (rol === 'Admin' || rol === 'Evaluator') {
-      api.get('/Kullanicilar').then(res => {
+      istekler.push(api.get('/Kullanicilar').then(res => {
         setCalisanlar(res.data.filter(k => k.rol === 'Employee'));
-      }).catch(() => {});
+      }));
+    }
+    if (rol === 'Admin') {
+      istekler.push(api.get('/Degerlendirmeler/departman-ozet').then(res => setDepartmanOzet(res.data)));
     }
     if (rol === 'Employee') {
-      api.get(`/Degerlendirmeler/skor/${id}`).then(res => setSkorDetay(res.data)).catch(() => {});
-      api.get(`/Degerlendirmeler/calisan/${id}`).then(res => {
+      istekler.push(api.get(`/Degerlendirmeler/skor/${id}`).then(res => setSkorDetay(res.data)));
+      istekler.push(api.get(`/Degerlendirmeler/calisan/${id}`).then(res => {
         const degerlendirmeler = res.data;
         const tekDonemler = [...new Set(degerlendirmeler.map(d => d.donem).filter(Boolean))].sort().reverse();
         setCalisanDonemleri(tekDonemler);
 
-        // Dönem bazlı grafik verisi
         const donemGrup = {};
         degerlendirmeler.forEach(d => {
           const donem = d.donem;
@@ -163,9 +238,15 @@ function Raporlar() {
           setPanelDonem(son.donem || '');
         }
         setSecilenCalisan(parseInt(id));
-      }).catch(() => {});
+      }));
     }
+
+    Promise.all(istekler)
+      .then(() => setYukleniyor(false))
+      .catch(() => { setHata('Veriler yüklenemedi.'); setYukleniyor(false); });
   }, [id, rol]);
+
+  useEffect(() => { ilkYuklemeGetir(); }, [ilkYuklemeGetir]);
 
   const donemDegistir = (donem) => {
     setSecilenDonem(donem);
@@ -175,6 +256,7 @@ function Raporlar() {
     setSonTarih('');
     setSonDonem('');
     siralamayiGetir(donem);
+    if (rol === 'Admin') departmanOzetiGetir(donem);
   };
 
   const [sonYorum, setSonYorum] = useState('');
@@ -182,8 +264,6 @@ function Raporlar() {
   const [sonDonem, setSonDonem] = useState('');
   const [calisanDonemleri, setCalisanDonemleri] = useState([]);
   const [panelDonem, setPanelDonem] = useState('');
-  const [hovExcel, setHovExcel] = useState(false);
-  const [hovPdf, setHovPdf] = useState(false);
 
   const donemeSkorGetir = (calisanId, donem) => {
     setPanelDonem(donem);
@@ -230,6 +310,19 @@ function Raporlar() {
     });
   };
 
+  const satirSec = (s) => {
+    if (secilenCalisan === s.id) {
+      setSecilenCalisan('');
+      setSkorDetay(null);
+      setSonYorum('');
+      setSonTarih('');
+      setSonDonem('');
+      setCalisanDonemleri([]);
+    } else {
+      calisanSkorGetir(s.id);
+    }
+  };
+
   const ozetSkorRenk = (skor) => skor >= 80 ? '#34d399' : skor >= 60 ? '#fbbf24' : '#fb7185';
   const kategoriRenk = (puan) => puan >= 4 ? '#10b981' : puan >= 3 ? '#f59e0b' : '#f43f5e';
 
@@ -253,6 +346,22 @@ function Raporlar() {
   const highlightIndex = grafikVerisi.findIndex(d => d.name === highlightAdi);
   const highlightRenk = highlightIndex >= 0 ? barRenk(highlightIndex, rol) : '#818cf8';
 
+  const secilenCalisanDepartman = (() => {
+    const bulunan = sadeceCalisanSiralama.find(s => s.id === secilenCalisan);
+    return bulunan ? bulunan.departman : '';
+  })();
+  const departmanHighlightIndex = departmanOzet.findIndex(d => d.departman === secilenCalisanDepartman);
+  const departmanHighlightRenk = departmanHighlightIndex >= 0 ? barRenk(departmanHighlightIndex, 'Admin') : '#818cf8';
+
+  const buYil = new Date().getFullYear().toString();
+  const buYilGrafik = employeeGrafik.filter(x => x.name.startsWith(buYil));
+  const buYilOrtalama = buYilGrafik.length > 0
+    ? (buYilGrafik.reduce((s, x) => s + x.skor, 0) / buYilGrafik.length).toFixed(1)
+    : null;
+  const tumZamanlarOrtalama = employeeGrafik.length > 0
+    ? (employeeGrafik.reduce((s, x) => s + x.skor, 0) / employeeGrafik.length).toFixed(1)
+    : null;
+
   return (
     <div style={styles.sayfa}>
       <style>{`
@@ -263,15 +372,24 @@ function Raporlar() {
         .dropdown-scroll::-webkit-scrollbar-thumb:hover { background: #4b5563; }
         .panel-select:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.25); }
         .recharts-wrapper:focus, .recharts-wrapper *:focus, .recharts-surface:focus { outline: none !important; }
+        .rapor-secenek:hover { background-color: rgba(255,255,255,0.05) !important; }
+        .excel-buton:hover { background-color: rgba(74,222,128,0.2) !important; }
+        .pdf-buton:hover { background-color: rgba(248,113,113,0.2) !important; }
+        @media (max-width: 768px) {
+          .icerik-responsive { margin-left: 0 !important; margin-top: 56px !important; padding: 20px 16px !important; min-width: 0 !important; }
+          .rapor-grid-responsive { grid-template-columns: 1fr !important; }
+          .rapor-grid-responsive > * { min-width: 0 !important; }
+          .rapor-topbar-responsive { flex-wrap: wrap; gap: 12px; }
+        }
       `}</style>
       <Sidebar />
-      <div style={styles.icerik}>
-        <div style={styles.topBar}>
+      <div className="icerik-responsive" style={styles.icerik}>
+        <div className="rapor-topbar-responsive" style={styles.topBar}>
           <div>
             <h2 style={styles.baslik}>Raporlar</h2>
             <p style={styles.altBaslik}>Performans analizi ve sıralama</p>
           </div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             {rol !== 'Employee' && donemler.length > 0 && (
               <CustomSelect
                 value={secilenDonem}
@@ -294,22 +412,20 @@ function Raporlar() {
               <>
                 <button
                   onClick={() => dosyaIndir('excel', 'PerformansRaporu.xlsx')}
-                  onMouseEnter={() => setHovExcel(true)}
-                  onMouseLeave={() => setHovExcel(false)}
-                  style={{ ...styles.excelButon, backgroundColor: hovExcel ? 'rgba(74,222,128,0.2)' : 'rgba(74,222,128,0.08)' }}
+                  className="excel-buton"
+                  style={{ ...styles.excelButon, backgroundColor: 'rgba(74,222,128,0.08)' }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                   </svg>
                   Excel
                 </button>
                 <button
                   onClick={() => dosyaIndir('pdf', 'PerformansRaporu.pdf')}
-                  onMouseEnter={() => setHovPdf(true)}
-                  onMouseLeave={() => setHovPdf(false)}
-                  style={{ ...styles.pdfButon, backgroundColor: hovPdf ? 'rgba(248,113,113,0.2)' : 'rgba(248,113,113,0.08)' }}
+                  className="pdf-buton"
+                  style={{ ...styles.pdfButon, backgroundColor: 'rgba(248,113,113,0.08)' }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
                   </svg>
                   PDF
@@ -319,6 +435,12 @@ function Raporlar() {
           </div>
         </div>
 
+        {yukleniyor ? (
+          <Spinner />
+        ) : hata ? (
+          <HataKutusu mesaj={hata} onTekrarDene={ilkYuklemeGetir} />
+        ) : (
+        <>
         {grafikVerisi.length > 0 && (
           <div style={styles.kart}>
             <div style={styles.kartBaslik}>{rol === 'Employee' ? 'Performans Grafiğim' : 'Çalışan Performans Grafiği'}</div>
@@ -344,7 +466,7 @@ function Raporlar() {
                 <Bar dataKey="skor" radius={[4, 4, 0, 0]} maxBarSize={64} activeBar={false}>
                   {grafikVerisi.map((d, i) => (
                     <Cell
-                      key={i}
+                      key={d.name}
                       fill={barRenk(i, rol)}
                       fillOpacity={rol === 'Employee' ? (panelDonem && d.name !== panelDonem ? 0.4 : 1) : (i >= 3 ? 0.8 : 1)}
                     />
@@ -357,7 +479,46 @@ function Raporlar() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: secilenCalisan ? '1fr 1fr' : '1fr', gap: '16px', marginTop: '16px' }}>
+        {rol === 'Admin' && departmanOzet.length > 0 && (
+          <div style={styles.kart}>
+            <div style={styles.kartBaslik}>Departman Karşılaştırması</div>
+            <div style={{ marginTop: '8px' }}>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart
+                  data={departmanOzet.map(d => ({
+                    name: d.departman,
+                    skor: d.ortalamaSkor != null ? parseFloat(d.ortalamaSkor.toFixed(1)) : null,
+                    calisanSayisi: d.calisanSayisi,
+                  }))}
+                  margin={{ top: 10, right: 20, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+                  <XAxis dataKey="name" tick={<ParlayanEksenEtiketi highlight={secilenCalisanDepartman} renk={departmanHighlightRenk} />} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fill: '#a0a0a0', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(15,23,42,0.8)',
+                      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.5)', padding: '8px 12px',
+                    }}
+                    labelStyle={{ color: '#fff', fontWeight: '600', marginBottom: '4px' }}
+                    itemStyle={{ color: '#e5e7eb' }}
+                    formatter={(val, ad, item) => [`${val} — ${item.payload.calisanSayisi} çalışan`, 'Ortalama Skor']}
+                    cursor={false}
+                  />
+                  <Bar dataKey="skor" radius={[4, 4, 0, 0]} maxBarSize={72}>
+                    {departmanOzet.map((d, i) => (
+                      <Cell key={d.departman} fill={d.ortalamaSkor != null ? barRenk(i, 'Admin') : '#64748b'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        <div className="rapor-grid-responsive" style={{ display: 'grid', gridTemplateColumns: secilenCalisan ? '1fr 1fr' : '1fr', gap: '16px', marginTop: '16px' }}>
           <div style={styles.kart}>
             <div style={styles.kartBaslik}>{rol === 'Employee' ? 'Performans Özetim' : 'Sıralama'}</div>
 
@@ -366,16 +527,21 @@ function Raporlar() {
                 {employeeGrafik.length > 0 && (
                   <>
                     <div style={{ textAlign: 'center', margin: '16px 0 24px' }}>
-                      <div style={styles.heroEtiket}>Genel Ortalama</div>
+                      <div style={styles.heroEtiket}>{buYil} Ortalaması</div>
                       <div style={{ fontSize: '48px', fontWeight: '700', color: '#f8fafc' }}>
-                        {(employeeGrafik.reduce((s, x) => s + x.skor, 0) / employeeGrafik.length).toFixed(1)}
+                        {buYilOrtalama ?? '-'}
                       </div>
+                      <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>Tüm zamanlar: {tumZamanlarOrtalama ?? '-'}</div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {employeeGrafik.map((d, i) => (
+                      {employeeGrafik.map(d => (
                         <div
-                          key={i}
+                          key={d.name}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`${d.name} dönemi detayını göster`}
                           onClick={() => donemeSkorGetir(parseInt(id), d.name)}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); donemeSkorGetir(parseInt(id), d.name); } }}
                           style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             padding: '12px 16px', borderRadius: '8px', cursor: 'pointer',
@@ -401,6 +567,7 @@ function Raporlar() {
                 )}
               </>
             ) : (
+              <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', marginTop: '8px' }}>
                 <thead>
                   <tr>
@@ -413,7 +580,9 @@ function Raporlar() {
                 <tbody>
                   {sadeceCalisanSiralama.map((s, i) => (
                     <tr
-                      key={i}
+                      key={s.id}
+                      tabIndex={0}
+                      aria-label={`${s.ad} ${s.soyad} detayını ${secilenCalisan === s.id ? 'kapat' : 'aç'}`}
                       style={{
                         borderBottom: '1px solid rgba(55,65,81,0.5)',
                         transition: 'background-color 0.15s',
@@ -421,18 +590,8 @@ function Raporlar() {
                         backgroundColor: secilenCalisan === s.id ? 'rgba(99,102,241,0.1)' : 'transparent',
                         cursor: 'pointer',
                       }}
-                      onClick={() => {
-                        if (secilenCalisan === s.id) {
-                          setSecilenCalisan('');
-                          setSkorDetay(null);
-                          setSonYorum('');
-                          setSonTarih('');
-                          setSonDonem('');
-                          setCalisanDonemleri([]);
-                        } else {
-                          calisanSkorGetir(s.id);
-                        }
-                      }}
+                      onClick={() => satirSec(s)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); satirSec(s); } }}
                       onMouseEnter={e => e.currentTarget.style.backgroundColor = secilenCalisan === s.id ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.05)'}
                       onMouseLeave={e => e.currentTarget.style.backgroundColor = secilenCalisan === s.id ? 'rgba(99,102,241,0.1)' : 'transparent'}
                     >
@@ -455,11 +614,24 @@ function Raporlar() {
                         <span style={{ fontWeight: '600', color: ozetSkorRenk(s.ortalamaToplamSkor) }}>
                           {s.ortalamaToplamSkor ? s.ortalamaToplamSkor.toFixed(2) : '-'}
                         </span>
+                        {(() => {
+                          const trend = trendHesapla(s.id);
+                          if (!trend) return null;
+                          return (
+                            <span
+                              title={`Önceki döneme göre ${trend.yukariMi ? '+' : ''}${trend.fark}`}
+                              style={{ marginLeft: '8px', fontSize: '12px', fontWeight: '600', color: trend.yukariMi ? '#34d399' : '#fb7185' }}
+                            >
+                              {trend.yukariMi ? '↑' : '↓'} {trend.yukariMi ? '+' : ''}{trend.fark}
+                            </span>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
 
@@ -491,8 +663,8 @@ function Raporlar() {
                   <div style={styles.heroEtiket}>Toplam Skor</div>
                   <div style={styles.skorBuyuk}>{typeof skorDetay.toplamSkor === 'number' ? skorDetay.toplamSkor.toFixed(1) : skorDetay.toplamSkor}</div>
                   <div style={styles.kategoriListesi}>
-                    {skorDetay.kategoriDetay && skorDetay.kategoriDetay.map((k, i) => (
-                      <div key={i} style={styles.kategoriSatir}>
+                    {skorDetay.kategoriDetay && skorDetay.kategoriDetay.map(k => (
+                      <div key={k.baslik} style={styles.kategoriSatir}>
                         <div style={styles.kategoriAdi}>{k.baslik}</div>
                         <div style={styles.kategoriSag}>
                           <div style={styles.barContainer}>
@@ -525,6 +697,8 @@ function Raporlar() {
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
     </div>
   );
